@@ -1,0 +1,5 @@
+# 자격증봄 공개 페이지의 검색 수집 정책을 정의한다.
+User-agent: *
+Allow: /
+
+Sitemap: https://certbom.vercel.app/sitemap.xml

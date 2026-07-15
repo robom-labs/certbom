@@ -1,0 +1,8 @@
+# 자격증봄 앱과 공유 패키지의 pnpm 워크스페이스를 정의한다.
+packages:
+  - "apps/*"
+  - "packages/*"
+
+onlyBuiltDependencies:
+  - esbuild
+  - sharp

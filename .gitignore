@@ -141,3 +141,8 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Browser verification artifacts
+work/*.png
+apps/web/playwright-report/
+apps/web/test-results/
