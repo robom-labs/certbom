@@ -41,7 +41,7 @@ export function SettingsScreen({ favoriteCount, onClear }: { favoriteCount: numb
 
       <section className="settings-card"><h3>개인정보와 지원</h3><a href="https://robom.kr/privacy" target="_blank" rel="noreferrer">개인정보 처리방침 <span>↗</span></a><a href="https://robom.kr/support" target="_blank" rel="noreferrer">문의와 지원 <span>↗</span></a><a href="https://robom.kr" target="_blank" rel="noreferrer">다른 로봄 앱 <span>↗</span></a></section>
 
-      <div className="app-meta"><img src="/icons/icon.svg" alt="" /><div><strong>자격증봄 0.4.0</strong><small>build {__BUILD_SHA__.slice(0, 7)} · cache v4</small></div><span>{updateReady ? "업데이트 준비됨" : "최신"}</span></div>
+      <div className="app-meta"><img src="/icons/icon.svg" alt="" /><div><strong>자격증봄 0.4.1</strong><small>build {__BUILD_SHA__.slice(0, 7)} · cache v5</small></div><span>{updateReady ? "업데이트 준비됨" : "최신"}</span></div>
     </main>
   );
 }

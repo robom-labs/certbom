@@ -41,7 +41,7 @@ export default defineConfig({
     }),
   ],
   define: {
-    __BUILD_SHA__: JSON.stringify(process.env.VITE_BUILD_SHA ?? "local"),
+    __BUILD_SHA__: JSON.stringify(process.env.VITE_BUILD_SHA ?? process.env.VERCEL_GIT_COMMIT_SHA ?? "local"),
   },
   test: {
     environment: "happy-dom",
