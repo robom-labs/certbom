@@ -1,0 +1,17 @@
+{
+  "name": "certbom",
+  "private": true,
+  "version": "0.4.0",
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "dev": "pnpm --filter @certbom/web dev",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "biome lint .",
+    "test": "pnpm -r test",
+    "build": "pnpm -r build",
+    "test:e2e": "pnpm --filter @certbom/web test:e2e"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.4"
+  }
+}

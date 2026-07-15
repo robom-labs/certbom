@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 자격증봄 공개 웹앱의 대표 URL을 검색엔진에 제공한다. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://certbom.vercel.app/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
+</urlset>
