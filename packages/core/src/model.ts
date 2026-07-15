@@ -24,6 +24,7 @@ export type ExamEvent = {
   officialSourceUrl: string;
   confirmed: boolean;
   regionCode?: string;
+  groupKey?: string;
 };
 
 export type PreparationItem = {
@@ -40,8 +41,11 @@ export type Exam = {
   slug: string;
   name: string;
   shortName?: string;
+  aliases: string[];
   organizer: string;
   category: string;
+  sourceId: string;
+  sourceName: string;
   goals: string[];
   description: string;
   officialUrl: string;

@@ -1,38 +1,54 @@
-// 시험 날짜·신뢰도·다음 행동을 쉬운 한국어로 바꾼다.
-import { eventRelevantUntil, type Exam, type ExamEvent, type TrustLevel } from "@certbom/core";
+// 시험 날짜·공식 확인 상태·다음 행동을 쉬운 한국어로 바꾼다.
+import { type Exam, type ExamEvent, getNextEvent, isApplicationOpen, type TrustLevel } from "@certbom/core";
 
 export const trustLabels: Record<TrustLevel, string> = {
-  "official-api": "공식 API",
-  "official-notice": "공식 공고 확인",
-  "manual-review": "일정 재확인 필요",
+  "official-api": "공식 데이터 확인",
+  "official-notice": "공식 일정 확인",
+  "manual-review": "공식 공고 연결",
   unverified: "검토 중",
 };
 
-export function formatEventDate(event: ExamEvent) {
-  const date = new Date(event.startAt);
-  const dateText = new Intl.DateTimeFormat("ko-KR", {
+function formatPoint(value: string, precision: ExamEvent["timePrecision"]) {
+  return new Intl.DateTimeFormat("ko-KR", {
     month: "long",
     day: "numeric",
     weekday: "short",
-    ...(event.timePrecision === "date-only" ? {} : { hour: "numeric", minute: "2-digit" }),
+    ...(precision === "date-only" ? {} : { hour: "numeric", minute: "2-digit" }),
     timeZone: "Asia/Seoul",
-  }).format(date);
-  return event.timePrecision === "conventional" ? `${dateText} · 표준 시각 기준` : dateText;
+  }).format(new Date(value));
+}
+
+function formatEndPoint(event: ExamEvent) {
+  if (!event.endAt) return "";
+  const startDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(event.startAt));
+  const endDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(event.endAt));
+  if (startDate === endDate && event.timePrecision !== "date-only") {
+    return new Intl.DateTimeFormat("ko-KR", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" }).format(new Date(event.endAt));
+  }
+  return formatPoint(event.endAt, event.timePrecision);
+}
+
+export function formatEventDate(event: ExamEvent) {
+  const start = formatPoint(event.startAt, event.timePrecision);
+  const range = event.endAt ? `${start} ~ ${formatEndPoint(event)}` : start;
+  return event.timePrecision === "conventional" ? `${range} · 표준 시각 기준` : range;
+}
+
+export function examStatusLabel(exam: Exam, now = new Date()) {
+  if (isApplicationOpen(exam, now)) return "지금 접수 중";
+  const event = getNextEvent(exam, now);
+  if (event?.type === "application-open") return "접수 예정";
+  if (event?.type === "exam") return "시험 예정";
+  if (event?.type === "result") return "발표 예정";
+  if (exam.scheduleType === "rolling") return "상시 접수";
+  if (exam.scheduleType === "announcement") return "공고 확인형";
+  return "공식 일정 확인";
 }
 
 export function nextAction(exam: Exam, now = new Date()) {
-  const event = exam.events
-    .filter((item) => eventRelevantUntil(item) >= now.getTime())
-    .sort((a, b) => {
-      const aStart = new Date(a.startAt).getTime();
-      const bStart = new Date(b.startAt).getTime();
-      const aActive = aStart <= now.getTime();
-      const bActive = bStart <= now.getTime();
-      if (aActive !== bActive) return aActive ? -1 : 1;
-      return aStart - bStart;
-    })[0];
+  const event = getNextEvent(exam, now);
   if (event) return { label: event.title, detail: formatEventDate(event), event };
-  if (exam.scheduleType === "rolling") return { label: "상시 접수 확인", detail: "원하는 시험장과 날짜를 공식 접수처에서 선택하세요." };
-  if (exam.scheduleType === "announcement") return { label: "최신 공고 확인", detail: "확정 일정은 시행기관 공고가 기준이에요." };
-  return { label: "다음 회차 확인", detail: "공식 API 연결 전에는 날짜를 추정하지 않아요." };
+  if (exam.scheduleType === "rolling") return { label: "시험장·날짜 선택", detail: "지역별 잔여 좌석을 공식 접수처에서 바로 확인하세요." };
+  if (exam.scheduleType === "announcement") return { label: "최신 시행 공고 확인", detail: "직렬과 단계별 확정 일정은 공식 공고가 기준이에요." };
+  return { label: "연간 일정 다시 확인", detail: "공식 일정 페이지에서 다음 회차와 변경 공고를 확인하세요." };
 }

@@ -32,7 +32,7 @@ export function createIcs(exam: Exam, event: ExamEvent) {
   const end = event.endAt ?? new Date(new Date(event.startAt).getTime() + 60 * 60 * 1000).toISOString();
   const dateOnly = event.timePrecision === "date-only";
   const startLine = dateOnly ? `DTSTART;VALUE=DATE:${toKstDate(event.startAt)}` : `DTSTART:${toIcsDate(event.startAt)}`;
-  const endLine = dateOnly ? `DTEND;VALUE=DATE:${nextDate(toKstDate(event.startAt))}` : `DTEND:${toIcsDate(end)}`;
+  const endLine = dateOnly ? `DTEND;VALUE=DATE:${nextDate(toKstDate(event.endAt ?? event.startAt))}` : `DTEND:${toIcsDate(end)}`;
   return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -53,7 +53,7 @@ export function createIcs(exam: Exam, event: ExamEvent) {
 export function createGoogleCalendarUrl(exam: Exam, event: ExamEvent) {
   const end = event.endAt ?? new Date(new Date(event.startAt).getTime() + 60 * 60 * 1000).toISOString();
   const dates = event.timePrecision === "date-only"
-    ? `${toKstDate(event.startAt)}/${nextDate(toKstDate(event.startAt))}`
+    ? `${toKstDate(event.startAt)}/${nextDate(toKstDate(event.endAt ?? event.startAt))}`
     : `${toIcsDate(event.startAt)}/${toIcsDate(end)}`;
   const params = new URLSearchParams({
     action: "TEMPLATE",

@@ -146,6 +146,7 @@ vite.config.ts.timestamp-*
 work/*.png
 apps/web/playwright-report/
 apps/web/test-results/
+apps/web/dev-dist/
 
 # Vercel local project link
 .vercel/

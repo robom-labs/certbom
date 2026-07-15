@@ -1,7 +1,7 @@
 // 자격증봄 PWA 빌드·오프라인·테스트 설정을 정의한다.
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vitest/config";
 import { VitePWA } from "vite-plugin-pwa";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [
@@ -12,7 +12,7 @@ export default defineConfig({
       manifest: {
         name: "자격증봄 CertBom",
         short_name: "자격증봄",
-        description: "시험 찾기부터 접수·시험일·준비물까지 놓치지 않게",
+        description: "97개 시험 찾기부터 공식 접수·시험일·준비물까지 놓치지 않게",
         theme_color: "#2457ef",
         background_color: "#fffaf0",
         display: "standalone",
@@ -32,7 +32,7 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/(www\.)?(historyexam\.go\.kr|q-net\.or\.kr|license\.korcham\.net)\//,
+            urlPattern: /^https:\/\/(www\.)?(historyexam\.go\.kr|q-net\.or\.kr|mo\.q-net\.or\.kr|license\.korcham\.net|dataq\.or\.kr|license\.kpc\.or\.kr|at\.kicpa\.or\.kr|gongmuwon\.gosi\.kr)\//,
             handler: "NetworkOnly",
           },
         ],

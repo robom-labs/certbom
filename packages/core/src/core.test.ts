@@ -1,18 +1,41 @@
-// 시험 카탈로그·일정·추천 규칙의 핵심 불변조건을 검증한다.
+// 확장된 시험 카탈로그·공식 일정·추천·캘린더의 핵심 불변조건을 검증한다.
 import { describe, expect, it } from "vitest";
-import { createGoogleCalendarUrl, createIcs, exams, getUpcomingEvents, recommend } from "./index";
+import {
+  catalogStats,
+  createGoogleCalendarUrl,
+  createIcs,
+  eventRelevantUntil,
+  exams,
+  getExam,
+  getUpcomingEventGroups,
+  getUpcomingEvents,
+  isApplicationOpen,
+  recommend,
+} from "./index";
 
 describe("시험 카탈로그", () => {
-  it("추천 3+7에 필요한 10개 시험을 제공한다", () => {
-    expect(exams).toHaveLength(10);
+  it("공식 출처 8곳의 시험 97개를 제공한다", () => {
+    expect(exams).toHaveLength(97);
+    expect(catalogStats.sourceCount).toBe(8);
+    expect(catalogStats.scheduledExamCount).toBeGreaterThanOrEqual(70);
   });
 
-  it("상시시험에는 고정 이벤트를 만들지 않는다", () => {
+  it("시험·일정·준비물 식별자가 서로 겹치지 않는다", () => {
+    expect(new Set(exams.map((exam) => exam.id)).size).toBe(exams.length);
+    const eventIds = exams.flatMap((exam) => exam.events.map((event) => event.id));
+    const preparationIds = exams.flatMap((exam) => exam.preparation.map((item) => item.id));
+    expect(new Set(eventIds).size).toBe(eventIds.length);
+    expect(new Set(preparationIds).size).toBe(preparationIds.length);
+  });
+
+  it("상시시험에는 임의의 고정 이벤트를 만들지 않는다", () => {
     expect(exams.filter((exam) => exam.scheduleType === "rolling").every((exam) => exam.events.length === 0)).toBe(true);
   });
 
   it("화면에 노출되는 이벤트는 공식 링크와 확인 상태를 가진다", () => {
     for (const exam of exams) {
+      expect(exam.officialUrl.startsWith("https://")).toBe(true);
+      expect(exam.trustLevel).not.toBe("official-api");
       for (const event of exam.events) {
         expect(event.confirmed).toBe(true);
         expect(event.officialSourceUrl.startsWith("https://")).toBe(true);
@@ -20,20 +43,24 @@ describe("시험 카탈로그", () => {
     }
   });
 
-  it("현재 이후 일정을 시간순으로 정렬한다", () => {
-    const events = getUpcomingEvents(new Date("2026-07-16T00:00:00+09:00"));
-    expect(events[0]?.event.id).toBe("history-79-cancel-seat");
-    expect(events.at(-1)?.event.id).toBe("history-79-result");
+  it("현재 접수 중인 일정을 시간순 목록 맨 앞에 둔다", () => {
+    const now = new Date("2026-07-16T12:00:00+09:00");
+    const events = getUpcomingEvents(now);
+    expect(events[0]?.event.id).toBe("logistics-manager-vacancy");
+    expect(events[0] && isApplicationOpen(events[0].exam, now)).toBe(true);
   });
 
-  it("진행 중인 접수는 마감 전까지 다가오는 일정에 남긴다", () => {
-    const events = getUpcomingEvents(new Date("2026-07-22T12:00:00+09:00"));
-    expect(events[0]?.event.id).toBe("history-79-cancel-seat");
+  it("날짜만 있는 접수 기간은 마지막 날이 끝날 때까지 유지한다", () => {
+    const exam = getExam("logistics-manager");
+    const event = exam?.events.find((item) => item.id.endsWith("vacancy"));
+    if (!event) throw new Error("날짜 범위 테스트 일정이 없습니다.");
+    expect(eventRelevantUntil(event)).toBeGreaterThan(new Date("2026-07-17T20:00:00+09:00").getTime());
   });
 
-  it("날짜만 확정된 발표는 해당 날짜가 끝날 때까지 유지한다", () => {
-    const events = getUpcomingEvents(new Date("2026-08-21T20:00:00+09:00"));
-    expect(events[0]?.event.id).toBe("history-79-result");
+  it("여러 종목이 공유하는 회차는 홈에서 한 일정으로 묶는다", () => {
+    const groups = getUpcomingEventGroups(new Date("2026-07-20T12:00:00+09:00"));
+    const technicalRegistration = groups.find((item) => item.event.groupKey === "qnet-tech-r3-application");
+    expect(technicalRegistration?.exams).toHaveLength(21);
   });
 });
 
@@ -43,16 +70,18 @@ describe("추천", () => {
     expect(result[0]?.exam.eligibilityRestricted).toBe(false);
   });
 
-  it("모든 결과에 설명과 규칙 버전을 남긴다", () => {
+  it("97개 결과에서 상위 3개와 추가 7개를 안정적으로 제공한다", () => {
     const result = recommend({ goal: "공무원", interest: "전체", duration: "long", practicalPossible: false, eligibilityRestrictedAllowed: true });
-    expect(result).toHaveLength(10);
+    expect(result).toHaveLength(97);
+    expect(result.slice(0, 3)).toHaveLength(3);
+    expect(result.slice(3, 10)).toHaveLength(7);
     expect(result.every((item) => item.ruleVersion && item.cautions.length > 0)).toBe(true);
   });
 });
 
 describe("캘린더 공유", () => {
   it("공식 링크를 포함한 ICS를 만든다", () => {
-    const exam = exams[0];
+    const exam = getExam("history-advanced");
     const event = exam?.events[0];
     if (!exam || !event) throw new Error("캘린더 테스트용 공식 일정이 없습니다.");
     const ics = createIcs(exam, event);
@@ -60,12 +89,12 @@ describe("캘린더 공유", () => {
     expect(ics).toContain(event.officialSourceUrl);
   });
 
-  it("시각 미상 발표일은 임의 시각이 아닌 종일 일정으로 만든다", () => {
-    const exam = exams[0];
-    const event = exam?.events.find((item) => item.timePrecision === "date-only");
+  it("날짜 범위를 끝 날짜 다음 날까지의 종일 일정으로 만든다", () => {
+    const exam = getExam("logistics-manager");
+    const event = exam?.events.find((item) => item.id.endsWith("vacancy"));
     if (!exam || !event) throw new Error("날짜 전용 테스트 일정이 없습니다.");
-    expect(createIcs(exam, event)).toContain("DTSTART;VALUE=DATE:20260821");
-    expect(createIcs(exam, event)).toContain("DTEND;VALUE=DATE:20260822");
-    expect(createGoogleCalendarUrl(exam, event)).toContain("dates=20260821%2F20260822");
+    expect(createIcs(exam, event)).toContain("DTSTART;VALUE=DATE:20260716");
+    expect(createIcs(exam, event)).toContain("DTEND;VALUE=DATE:20260718");
+    expect(createGoogleCalendarUrl(exam, event)).toContain("dates=20260716%2F20260718");
   });
 });

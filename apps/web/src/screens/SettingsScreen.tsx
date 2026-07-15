@@ -1,4 +1,6 @@
 // 계정 준비 상태·접근성·데이터 출처·앱 정보를 한곳에 제공한다.
+
+import { CATALOG_DATA_VERSION, CATALOG_UPDATED_AT, catalogStats } from "@certbom/core";
 import { useEffect, useState } from "react";
 import { AppHeader } from "../components/AppHeader";
 
@@ -37,11 +39,11 @@ export function SettingsScreen({ favoriteCount, onClear }: { favoriteCount: numb
 
       <section className="settings-card"><h3>글자 크기</h3><p>선택 즉시 화면 전체에 적용돼요.</p><div className="font-options">{["100", "115", "130"].map((value) => <button type="button" aria-pressed={scale === value} onClick={() => setScale(value)} key={value}>{value === "100" ? "기본" : value === "115" ? "크게" : "아주 크게"}</button>)}</div></section>
 
-      <section className="settings-card"><h3>데이터와 알림</h3><dl><div><dt>공식 출처</dt><dd>4개 기관 레지스트리</dd></div><div><dt>마지막 확인</dt><dd>2026. 7. 16.</dd></div><div><dt>네트워크</dt><dd>{online ? "온라인" : "오프라인 · 저장 정보 표시"}</dd></div><div><dt>기기 저장</dt><dd>관심 시험 {favoriteCount}개</dd></div></dl><button className="ghost-button" type="button" onClick={onClear}>기기 저장 데이터 지우기</button></section>
+      <section className="settings-card"><h3>데이터와 알림</h3><dl><div><dt>시험 데이터</dt><dd>{catalogStats.examCount}개 시험 · 일정 {catalogStats.scheduledExamCount}개</dd></div><div><dt>공식 출처</dt><dd>{catalogStats.sourceCount}개 출처</dd></div><div><dt>마지막 확인</dt><dd>{new Date(CATALOG_UPDATED_AT).toLocaleDateString("ko-KR")}</dd></div><div><dt>네트워크</dt><dd>{online ? "온라인" : "오프라인 · 저장 정보 표시"}</dd></div><div><dt>기기 저장</dt><dd>관심 시험 {favoriteCount}개</dd></div></dl><button className="ghost-button" type="button" onClick={onClear}>기기 저장 데이터 지우기</button></section>
 
       <section className="settings-card"><h3>개인정보와 지원</h3><a href="https://robom.kr/privacy" target="_blank" rel="noreferrer">개인정보 처리방침 <span>↗</span></a><a href="https://robom.kr/support" target="_blank" rel="noreferrer">문의와 지원 <span>↗</span></a><a href="https://robom.kr" target="_blank" rel="noreferrer">다른 로봄 앱 <span>↗</span></a></section>
 
-      <div className="app-meta"><img src="/icons/icon.svg" alt="" /><div><strong>자격증봄 0.4.1</strong><small>build {__BUILD_SHA__.slice(0, 7)} · cache v5</small></div><span>{updateReady ? "업데이트 준비됨" : "최신"}</span></div>
+      <div className="app-meta"><img src="/icons/icon.svg" alt="" /><div><strong>자격증봄 0.5.0</strong><small>build {__BUILD_SHA__.slice(0, 7)} · data {CATALOG_DATA_VERSION} · cache v6</small></div><span>{updateReady ? "업데이트 준비됨" : "최신"}</span></div>
     </main>
   );
 }

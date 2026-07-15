@@ -2,7 +2,7 @@
 import { exams } from "./catalog";
 import type { RecommendationProfile, RecommendationResult } from "./model";
 
-const RULE_VERSION = "2026.07-v1";
+const RULE_VERSION = "2026.07-v2";
 
 export function recommend(profile: RecommendationProfile): RecommendationResult[] {
   return exams

@@ -7,7 +7,7 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
         <p className="app-header__eyebrow">robom · 놓치지 않는 시험 준비</p>
         <h1><span>자격증</span><mark>봄</mark></h1>
       </div>
-      <span className="source-pill">공식 출처</span>
+      <span className="source-pill">공식 일정 확인</span>
     </header>
   );
 }

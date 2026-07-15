@@ -13,8 +13,7 @@ type Props = {
 
 export function DetailScreen({ exam, favorite, checkedIds, onBack, onToggleFavorite, onToggleChecked }: Props) {
   const action = nextAction(exam);
-  const firstEvent = exam.events[0];
-  const calendarEvent = action.event ?? firstEvent;
+  const calendarEvent = action.event;
 
   const downloadIcs = () => {
     if (!calendarEvent) return;
@@ -36,17 +35,17 @@ export function DetailScreen({ exam, favorite, checkedIds, onBack, onToggleFavor
   return (
     <main className="screen detail-screen">
       <button className="back-button" type="button" onClick={onBack}>← 시험 목록</button>
-      <div className="detail-heading"><span className="trust-badge">{trustLabels[exam.trustLevel]}</span><h1>{exam.name}</h1><p>{exam.organizer} · 마지막 확인 {new Date(exam.lastVerifiedAt).toLocaleDateString("ko-KR")}</p></div>
+      <div className="detail-heading"><span className="trust-badge">{trustLabels[exam.trustLevel]}</span><h1>{exam.name}</h1><p>{exam.sourceName} · 마지막 확인 {new Date(exam.lastVerifiedAt).toLocaleDateString("ko-KR")}</p></div>
 
       <section className="next-action-card"><p>지금 해야 할 일</p><h2>{action.label}</h2><strong>{action.detail}</strong><a href={exam.applicationUrl ?? exam.officialUrl} target="_blank" rel="noreferrer">공식 접수처에서 확인 <span>↗</span></a></section>
 
       <button className={`follow-button${favorite ? " is-on" : ""}`} type="button" aria-pressed={favorite} onClick={() => onToggleFavorite(exam.id)}>{favorite ? "★ 관심 시험으로 저장됨" : "☆ 관심 시험 저장하기"}</button>
 
-      <section className="detail-card"><h2>이 시험은요.</h2><p>{exam.description}</p><dl><div><dt>일정 방식</dt><dd>{exam.scheduleType === "rolling" ? "상시 · 시험장별 날짜 선택" : exam.scheduleType === "announcement" ? "공고 확인형" : "회차별 정기 시험"}</dd></div><div><dt>시험 구성</dt><dd>{exam.practical ? "필기·실기 확인" : "필기 중심"}</dd></div>{exam.feeLabel && <div><dt>응시료</dt><dd>{exam.feeLabel}</dd></div>}</dl><p className="caution">{exam.caution}</p></section>
+      <section className="detail-card"><h2>이 시험은요.</h2><p>{exam.description}</p><dl><div><dt>일정 방식</dt><dd>{exam.scheduleType === "rolling" ? "상시 · 시험장별 날짜 선택" : exam.scheduleType === "announcement" ? "공고 확인형" : "회차별 정기 시험"}</dd></div><div><dt>시험 구성</dt><dd>{exam.practical ? "필기·실기 확인" : "필기 중심"}</dd></div><div><dt>일정 출처</dt><dd>{exam.sourceName}</dd></div>{exam.feeLabel && <div><dt>응시료</dt><dd>{exam.feeLabel}</dd></div>}</dl><p className="caution">{exam.caution}</p></section>
 
-      <section className="detail-card"><h2>공식 일정</h2>{exam.events.length ? <ol className="timeline">{exam.events.map((event) => <li key={event.id}><span aria-hidden="true" /><div><strong>{event.title}</strong><time dateTime={event.startAt}>{formatEventDate(event)}</time>{event.regionCode && <small>대상 지역 {event.regionCode === "ALL" ? "전 지역" : event.regionCode}</small>}</div></li>)}</ol> : <div className="inline-empty"><strong>날짜를 추정해 표시하지 않아요.</strong><p>공식 API 또는 공고 확인 후 확정 일정만 보여드릴게요.</p></div>}</section>
+      <section className="detail-card"><div className="detail-card__head"><h2>2026 공식 일정</h2><a href={exam.officialUrl} target="_blank" rel="noreferrer">원문 ↗</a></div>{exam.events.length ? <ol className="timeline">{exam.events.map((event) => <li key={event.id}><span aria-hidden="true" /><div><strong>{event.title}</strong><time dateTime={event.startAt}>{formatEventDate(event)}</time>{event.regionCode && <small>대상 지역 {event.regionCode === "ALL" ? "전 지역" : event.regionCode}</small>}</div></li>)}</ol> : <div className="inline-empty"><strong>{exam.scheduleType === "rolling" ? "시험장별 날짜를 직접 선택하는 상시 시험이에요." : "다음 확정 일정은 공식 페이지에서 확인해 주세요."}</strong><p>확인되지 않은 날짜를 임의로 만들지 않고 공식 접수처로 바로 연결합니다.</p></div>}</section>
 
-      <section className="detail-card"><h2>시험 당일 준비</h2><p>공식 출처로 확인된 항목만 체크할 수 있어요.</p><div className="checklist">{exam.preparation.map((item) => <label key={item.id}><input type="checkbox" checked={checkedIds.includes(item.id)} onChange={() => onToggleChecked(item.id)} /><span><strong>{item.label}{item.required && <em>필수</em>}</strong><small>{item.detail}</small></span></label>)}</div><a className="source-link" href={exam.officialUrl} target="_blank" rel="noreferrer">준비물 공식 출처 확인 ↗</a></section>
+      <section className="detail-card"><h2>시험 당일 준비</h2><p>시험별 공식 기준을 확인한 뒤 기기에서 체크해 두세요.</p><div className="checklist">{exam.preparation.map((item) => <label key={item.id}><input type="checkbox" checked={checkedIds.includes(item.id)} onChange={() => onToggleChecked(item.id)} /><span><strong>{item.label}{item.required && <em>필수</em>}</strong><small>{item.detail}</small></span></label>)}</div><a className="source-link" href={exam.officialUrl} target="_blank" rel="noreferrer">준비물 공식 출처 확인 ↗</a></section>
 
       <section className="detail-card"><h2>일정 공유</h2><div className="share-grid"><button type="button" onClick={share}>공유하기</button><button type="button" disabled={!calendarEvent} onClick={downloadIcs}>ICS 저장</button>{calendarEvent ? <a href={createGoogleCalendarUrl(exam, calendarEvent)} target="_blank" rel="noreferrer">Google 캘린더</a> : <span>일정 확정 후 캘린더 제공</span>}</div></section>
 
