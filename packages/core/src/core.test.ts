@@ -83,6 +83,22 @@ describe("시험 카탈로그", () => {
     expect(isApplicationUpcoming(history, now)).toBe(true);
   });
 
+  it("날짜 전용 시험은 시험 당일에도 곧 시험으로 포함한다", () => {
+    const exam = getExam("logistics-manager");
+    if (!exam) throw new Error("물류관리사 시험을 찾지 못했습니다.");
+    const examDayNoon = new Date("2026-07-25T12:00:00+09:00");
+    expect(isExamUpcoming(exam, examDayNoon)).toBe(true);
+  });
+
+  it("진행 중인 기간형 시험은 종료 전까지 곧 시험으로 포함한다", () => {
+    const exam = getExam("information-engineer");
+    if (!exam) throw new Error("정보처리기사 시험을 찾지 못했습니다.");
+    const midPeriod = new Date("2026-08-20T12:00:00+09:00");
+    expect(isExamUpcoming(exam, midPeriod)).toBe(true);
+    const afterPeriod = new Date("2026-09-02T12:00:00+09:00");
+    expect(isExamUpcoming(exam, afterPeriod)).toBe(false);
+  });
+
   it("윤년 날짜 전용 일정은 KST 마지막 순간까지 유효하다", () => {
     expect(eventRelevantUntil({
       id: "leap-day",

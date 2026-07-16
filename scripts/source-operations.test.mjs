@@ -10,6 +10,7 @@ import {
   runFourHundredDaySimulation,
   stableFingerprint,
 } from "./source-operations-core.mjs";
+import { fetchJsonWithRetry } from "./source-operations.mjs";
 
 const fixture = {
   implYy: "2026",
@@ -69,6 +70,28 @@ test("heartbeat는 36시간과 72시간 경계를 구분한다", () => {
   assert.equal(evaluateHeartbeat("2026-07-15T12:00:00Z", now).status, "healthy");
   assert.equal(evaluateHeartbeat("2026-07-14T23:00:00Z", now).status, "stale");
   assert.equal(evaluateHeartbeat("2026-07-13T11:00:00Z", now).status, "critical");
+});
+
+test("결정적 실패(4xx·비JSON)는 재시도 없이 1회 호출로 즉시 중단한다", async () => {
+  let notFoundCalls = 0;
+  await assert.rejects(
+    () => fetchJsonWithRetry("https://example.invalid/qnet", 3, async () => {
+      notFoundCalls += 1;
+      return new Response("not found", { status: 404 });
+    }),
+    /Q-Net HTTP 404/,
+  );
+  assert.equal(notFoundCalls, 1);
+
+  let nonJsonCalls = 0;
+  await assert.rejects(
+    () => fetchJsonWithRetry("https://example.invalid/qnet", 3, async () => {
+      nonJsonCalls += 1;
+      return new Response("<html>maintenance</html>", { status: 200 });
+    }),
+    /JSON이 아닌 응답/,
+  );
+  assert.equal(nonJsonCalls, 1);
 });
 
 test("400일 시간 이동에 연도 전환과 다음 연도 대상이 끊기지 않는다", () => {

@@ -159,7 +159,7 @@ export function isExamUpcoming(exam: Exam, now = new Date(), horizonDays = UPCOM
   return exam.events.some((event) => {
     if (event.type !== "exam") return false;
     const start = new Date(event.startAt).getTime();
-    return start >= now.getTime() && start <= limit;
+    return start <= limit && eventRelevantUntil(event) >= now.getTime();
   });
 }
 

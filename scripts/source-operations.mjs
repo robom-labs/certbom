@@ -1,6 +1,7 @@
 // 자격증봄 공식 소스를 검증하고 Q-Net 후보 스냅샷을 안전하게 수집한다.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   QNET_ENDPOINT,
   detectSourceAnomalies,
@@ -68,11 +69,17 @@ function retryDelay(response, attempt) {
   return Math.min(1_000 * 2 ** attempt, 8_000);
 }
 
-async function fetchJsonWithRetry(url, attempts = 3) {
+function deterministicError(message) {
+  const error = new Error(message);
+  error.deterministic = true;
+  return error;
+}
+
+export async function fetchJsonWithRetry(url, attempts = 3, fetchImpl = fetch) {
   let lastError;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
-      const response = await fetch(url, {
+      const response = await fetchImpl(url, {
         headers: { accept: "application/json" },
         signal: AbortSignal.timeout(20_000),
       });
@@ -81,15 +88,19 @@ async function fetchJsonWithRetry(url, attempts = 3) {
         try {
           return JSON.parse(text);
         } catch {
-          throw new Error(`Q-Net이 JSON이 아닌 응답을 반환했습니다: ${text.slice(0, 120)}`);
+          // 비JSON 응답은 재시도해도 같으므로 즉시 중단한다.
+          throw deterministicError(`Q-Net이 JSON이 아닌 응답을 반환했습니다: ${text.slice(0, 120)}`);
         }
       }
       if (response.status !== 429 && response.status < 500) {
-        throw new Error(`Q-Net HTTP ${response.status}`);
+        // 429를 제외한 4xx는 결정적 실패이므로 즉시 중단한다.
+        throw deterministicError(`Q-Net HTTP ${response.status}`);
       }
       lastError = new Error(`Q-Net HTTP ${response.status}`);
-      await new Promise((resolveDelay) => setTimeout(resolveDelay, retryDelay(response, attempt)));
+      if (attempt < attempts - 1) await new Promise((resolveDelay) => setTimeout(resolveDelay, retryDelay(response, attempt)));
     } catch (error) {
+      if (error?.deterministic) throw error;
+      // 네트워크 오류·타임아웃·5xx·429만 transient로 보고 재시도한다.
       lastError = error;
       if (attempt < attempts - 1) await new Promise((resolveDelay) => setTimeout(resolveDelay, Math.min(1_000 * 2 ** attempt, 8_000)));
     }
@@ -214,8 +225,11 @@ async function sync() {
   if (hasFlag("strict") && status !== "PASS") process.exitCode = 2;
 }
 
-const command = process.argv[2] ?? "verify";
-if (command === "verify") await verify();
-else if (command === "simulate") await simulate();
-else if (command === "sync") await sync();
-else throw new Error(`지원하지 않는 source operation입니다: ${command}`);
+const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isDirectRun) {
+  const command = process.argv[2] ?? "verify";
+  if (command === "verify") await verify();
+  else if (command === "simulate") await simulate();
+  else if (command === "sync") await sync();
+  else throw new Error(`지원하지 않는 source operation입니다: ${command}`);
+}

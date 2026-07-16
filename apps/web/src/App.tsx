@@ -12,8 +12,8 @@ import { SettingsScreen } from "./screens/SettingsScreen";
 import { useStoredIds } from "./storage";
 
 type Route =
-  | { kind: "tab"; tab: Tab; recommend?: boolean; homeFilter?: HomeSummaryFilter }
-  | { kind: "exam"; examId: string; from: Tab; homeFilter?: HomeSummaryFilter };
+  | { kind: "tab"; tab: Tab; recommend?: boolean; homeFilter?: HomeSummaryFilter; findQuery?: string; findFilter?: string }
+  | { kind: "exam"; examId: string; from: Tab; homeFilter?: HomeSummaryFilter; findQuery?: string; findFilter?: string };
 
 const tabs: Tab[] = ["home", "find", "schedule", "settings"];
 const homeFilters: HomeSummaryFilter[] = ["all", "open", "upcoming"];
@@ -30,6 +30,14 @@ function homeHash(filter: HomeSummaryFilter) {
   return `home?filter=${filter}`;
 }
 
+function findHash(query: string, filter: string) {
+  const params = new URLSearchParams();
+  if (query) params.set("q", query);
+  if (filter && filter !== "all") params.set("filter", filter);
+  const search = params.toString();
+  return search ? `find?${search}` : "find";
+}
+
 function readRoute(): Route {
   const value = window.location.hash.replace(/^#\/?/, "");
   const [path = "", query = ""] = value.split("?");
@@ -40,9 +48,12 @@ function readRoute(): Route {
       examId: path.slice(5),
       from: parseTab(params.get("from")),
       homeFilter: parseHomeFilter(params.get("filter")),
+      findQuery: params.get("q") ?? "",
+      findFilter: params.get("filter") ?? "all",
     };
   }
   if (path === "recommend") return { kind: "tab", tab: "find", recommend: true };
+  if (path === "find") return { kind: "tab", tab: "find", findQuery: params.get("q") ?? "", findFilter: params.get("filter") ?? "all" };
   if (path === "home") return { kind: "tab", tab: "home", homeFilter: parseHomeFilter(params.get("filter")) };
   if (tabs.includes(path as Tab)) return { kind: "tab", tab: path as Tab };
   return { kind: "tab", tab: "home", homeFilter: "open" };
@@ -82,10 +93,16 @@ export function App() {
     window.location.hash = recommend ? "recommend" : tab === "home" ? homeHash(filter) : tab;
     window.scrollTo({ top: 0, behavior: "auto" });
   };
+  const syncFindState = (query: string, filterId: string) => {
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#${findHash(query, filterId)}`);
+    setRoute(readRoute());
+  };
   const openExam = (examId: string) => {
     const from = route.kind === "tab" ? route.tab : route.from;
     const filter = route.kind === "tab" && route.tab === "home" ? route.homeFilter ?? "open" : route.homeFilter ?? "open";
-    const originHash = from === "home" ? homeHash(filter) : from;
+    const findQuery = route.findQuery ?? "";
+    const findFilter = route.findFilter ?? "all";
+    const originHash = from === "home" ? homeHash(filter) : from === "find" ? findHash(findQuery, findFilter) : from;
     try {
       window.sessionStorage.setItem(`certbom-scroll:${originHash}`, String(window.scrollY));
     } catch {
@@ -93,12 +110,20 @@ export function App() {
     }
     const params = new URLSearchParams({ from });
     if (from === "home") params.set("filter", filter);
+    if (from === "find") {
+      if (findQuery) params.set("q", findQuery);
+      if (findFilter !== "all") params.set("filter", findFilter);
+    }
     trackFamilyEvent("exam_opened", `${from}-catalog`);
     window.location.hash = `exam/${examId}?${params.toString()}`;
     window.scrollTo({ top: 0, behavior: "auto" });
   };
   const returnToOrigin = (examRoute: Extract<Route, { kind: "exam" }>) => {
-    const target = examRoute.from === "home" ? homeHash(examRoute.homeFilter ?? "open") : examRoute.from;
+    const target = examRoute.from === "home"
+      ? homeHash(examRoute.homeFilter ?? "open")
+      : examRoute.from === "find"
+        ? findHash(examRoute.findQuery ?? "", examRoute.findFilter ?? "all")
+        : examRoute.from;
     window.location.hash = target;
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
@@ -124,7 +149,7 @@ export function App() {
       if (!exam) return <FindScreen favorites={favorites.ids} onOpen={openExam} onToggleFavorite={toggleFavorite} />;
       return <DetailScreen exam={exam} favorite={favorites.ids.includes(exam.id)} checkedIds={checked.ids} storageError={checked.saveFailed} onBack={() => returnToOrigin(route)} onToggleFavorite={toggleFavorite} onToggleChecked={checked.toggle} />;
     }
-    if (route.tab === "find") return <FindScreen favorites={favorites.ids} startRecommend={route.recommend} onOpen={openExam} onToggleFavorite={toggleFavorite} />;
+    if (route.tab === "find") return <FindScreen favorites={favorites.ids} startRecommend={route.recommend} initialQuery={route.findQuery} initialFilter={route.findFilter} onStateChange={syncFindState} onOpen={openExam} onToggleFavorite={toggleFavorite} />;
     if (route.tab === "schedule") return <ScheduleScreen favoriteIds={favorites.ids} onFind={() => navigateTab("find")} onOpen={openExam} />;
     if (route.tab === "settings") return <SettingsScreen favoriteCount={favorites.ids.length} install={pwaInstall} updateReady={Boolean(applyUpdate)} onApplyUpdate={applyUpdate ?? undefined} onClear={() => { favorites.clear(); checked.clear(); }} />;
     return <HomeScreen selectedFilter={route.homeFilter ?? "open"} favorites={favorites.ids} onFilterChange={(filter) => navigateTab("home", false, filter)} onFind={() => navigateTab("find")} onRecommend={() => navigateTab("find", true)} onOpen={openExam} onToggleFavorite={toggleFavorite} />;

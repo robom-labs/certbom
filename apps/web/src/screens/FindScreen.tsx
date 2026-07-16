@@ -1,7 +1,7 @@
 // 검색·상태 필터·추천 설문으로 많은 시험을 모바일에서 빠르게 좁힌다.
 
 import { catalogStats, type Exam, exams, getNextEvent, isApplicationOpen, type RecommendationProfile, recommend } from "@certbom/core";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { trackFamilyEvent } from "../analytics";
 import { AppHeader } from "../components/AppHeader";
 import { ExamCard } from "../components/ExamCard";
@@ -32,9 +32,16 @@ const initialProfile: RecommendationProfile = {
 type Props = {
   favorites: string[];
   startRecommend?: boolean;
+  initialQuery?: string;
+  initialFilter?: string;
   onOpen: (id: string) => void;
   onToggleFavorite: (id: string) => void;
+  onStateChange?: (query: string, filterId: string) => void;
 };
+
+function sanitizeFilterId(value: string) {
+  return filters.some((item) => item.id === value) ? value : "all";
+}
 
 function priority(exam: Exam, now: Date) {
   if (isApplicationOpen(exam, now)) return 0;
@@ -45,13 +52,19 @@ function priority(exam: Exam, now: Date) {
   return 4;
 }
 
-export function FindScreen({ favorites, startRecommend = false, onOpen, onToggleFavorite }: Props) {
+export function FindScreen({ favorites, startRecommend = false, initialQuery = "", initialFilter = "all", onOpen, onToggleFavorite, onStateChange }: Props) {
   const [mode, setMode] = useState<"direct" | "recommend">(startRecommend ? "recommend" : "direct");
-  const [query, setQuery] = useState("");
-  const [filterId, setFilterId] = useState("all");
+  const [query, setQuery] = useState(initialQuery);
+  const [filterId, setFilterId] = useState(() => sanitizeFilterId(initialFilter));
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [profile, setProfile] = useState(initialProfile);
   const [showResults, setShowResults] = useState(false);
+
+  useEffect(() => {
+    // 뒤로 가기·해시 변경으로 URL이 바뀌면 검색어·필터 상태를 URL과 다시 맞춘다.
+    setQuery(initialQuery);
+    setFilterId(sanitizeFilterId(initialFilter));
+  }, [initialQuery, initialFilter]);
 
   const filtered = useMemo(() => {
     const now = new Date();
@@ -71,11 +84,13 @@ export function FindScreen({ favorites, startRecommend = false, onOpen, onToggle
   const updateQuery = (value: string) => {
     setQuery(value);
     setVisibleCount(PAGE_SIZE);
+    onStateChange?.(value, filterId);
   };
 
   const updateFilter = (value: string) => {
     setFilterId(value);
     setVisibleCount(PAGE_SIZE);
+    onStateChange?.(query, value);
   };
 
   return (
