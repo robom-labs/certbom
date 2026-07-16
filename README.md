@@ -12,6 +12,8 @@
 - 접수 기간의 시작·종료일, 수험표·시험·발표 agenda와 시험별 준비물 체크.
 - 관심 시험 로컬 저장, 링크 공유, ICS와 Google Calendar 내보내기.
 - 설치 가능한 PWA, 오프라인 앱 셸, 모바일 하단 메뉴와 큰 터치 영역.
+- 로봄 패밀리 공통 봄 wordmark·선형 SVG 메뉴와 다섯 앱을 잇는 설정 화면.
+- 게스트 우선 기기 저장, 직접 PWA 설치 안내와 동의 기본 꺼짐 개인정보 최소 분석 adapter.
 - Q-Net 어댑터 계약, Supabase RLS 마이그레이션, 공식 출처·검증 시각 레지스트리.
 
 현재 Q-Net 공공데이터 API 운영 키는 등록되지 않았습니다. 따라서 API 연결로 오해할 표시는 제거했고, 공식 공고·공식 PDF·시행기관 일정 페이지를 2026년 7월 16일에 교차 확인한 스냅샷을 제공합니다. 상시검정은 지역·시험장마다 날짜가 달라 임의 날짜 대신 공식 접수처로 연결합니다.
@@ -24,8 +26,10 @@
 pnpm install
 pnpm dev
 pnpm typecheck
+pnpm lint
 pnpm test
 pnpm build
+pnpm test:e2e
 ```
 
 환경 변수와 외부 콘솔 설정은 [운영 준비 문서](ops/runbooks/production-setup.md)를 확인하세요.

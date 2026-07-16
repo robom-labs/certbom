@@ -2,8 +2,10 @@
 
 import { catalogStats, type Exam, exams, getNextEvent, isApplicationOpen, type RecommendationProfile, recommend } from "@certbom/core";
 import { useMemo, useState } from "react";
+import { trackFamilyEvent } from "../analytics";
 import { AppHeader } from "../components/AppHeader";
 import { ExamCard } from "../components/ExamCard";
+import { FamilyIcon } from "../components/FamilyIcon";
 
 const recommendationInterests = ["전체", "사무", "IT", "안전", "공무원", "복지", "데이터", "회계"];
 const PAGE_SIZE = 12;
@@ -93,7 +95,7 @@ export function FindScreen({ favorites, startRecommend = false, onOpen, onToggle
           </section>
           <label className="search-box">
             <span className="sr-only">시험 검색</span>
-            <span aria-hidden="true">⌕</span>
+            <FamilyIcon name="search" />
             <input value={query} onChange={(event) => updateQuery(event.target.value)} placeholder="시험명·별칭·기관·분야 검색" />
           </label>
           <fieldset className="filter-chips">
@@ -114,7 +116,7 @@ export function FindScreen({ favorites, startRecommend = false, onOpen, onToggle
           <Question label="준비 가능한 기간은 어느 정도인가요?" value={profile.duration} options={["short", "medium", "long"]} labels={{ short: "3개월 안", medium: "3~6개월", long: "6개월 이상" }} onChange={(duration) => setProfile({ ...profile, duration: duration as RecommendationProfile["duration"] })} />
           <BinaryQuestion label="실기 시험도 준비할 수 있나요?" value={profile.practicalPossible} onChange={(practicalPossible) => setProfile({ ...profile, practicalPossible })} />
           <BinaryQuestion label="경력·학력 같은 응시자격도 확인할까요?" value={profile.eligibilityRestrictedAllowed} onChange={(eligibilityRestrictedAllowed) => setProfile({ ...profile, eligibilityRestrictedAllowed })} />
-          <button className="primary-button" type="button" onClick={() => setShowResults(true)}>추천 결과 보기</button>
+          <button className="primary-button" type="button" onClick={() => { trackFamilyEvent("recommendation_completed", "recommendation"); setShowResults(true); }}>추천 결과 보기</button>
 
           {showResults && (
             <div className="recommend-results" aria-live="polite">

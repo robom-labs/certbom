@@ -1,7 +1,7 @@
 {
   "name": "certbom",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.6.0",
   "packageManager": "pnpm@9.15.9",
   "scripts": {
     "dev": "pnpm --filter @certbom/web dev",
@@ -9,7 +9,8 @@
     "lint": "biome lint .",
     "test": "pnpm -r test",
     "build": "pnpm -r build",
-    "test:e2e": "pnpm --filter @certbom/web test:e2e"
+    "test:e2e": "pnpm --filter @certbom/web test:e2e",
+    "audit:prod": "node scripts/audit-production.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.4"

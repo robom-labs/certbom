@@ -56,3 +56,62 @@ test("가로 스크롤이 생기지 않는다", async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(overflow).toBe(false);
 });
+
+test("패밀리 wordmark와 선형 SVG 하단 메뉴가 모바일 터치 크기를 지킨다", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".family-wordmark img")).toBeVisible();
+  await expect(page.locator(".bottom-nav svg.family-icon")).toHaveCount(4);
+  const touchHeights = await page.locator(".bottom-nav button").evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().height));
+  expect(touchHeights.every((height) => height >= 48)).toBe(true);
+});
+
+test("설정에서 다섯 패밀리 앱과 게스트·지원·개인정보·0.6.0 메타를 확인한다", async ({ page }) => {
+  await page.goto("/#settings");
+  await expect(page.locator("[data-family-app]")).toHaveCount(5);
+  await expect(page.getByRole("link", { name: /문의와 지원/ })).toHaveAttribute("href", "https://robom.kr/support");
+  await expect(page.getByRole("link", { name: /자격증봄 개인정보 처리방침/ })).toHaveAttribute("href", "https://robom.kr/privacy/certbom");
+  await expect(page.getByText("0.6.0", { exact: true })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: /익명 사용성 분석 허용/ })).not.toBeChecked();
+
+  await page.getByRole("button", { name: /카카오 연결 준비 상태/ }).click();
+  await expect(page.getByText(/카카오 로그인은 아직 연결되지 않았어요/)).toBeVisible();
+});
+
+test("beforeinstallprompt를 사용자 설치 CTA에서만 실행한다", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => {
+    const event = new Event("beforeinstallprompt", { cancelable: true });
+    Object.assign(event, {
+      prompt: () => Promise.resolve(),
+      userChoice: Promise.resolve({ outcome: "accepted", platform: "web" }),
+    });
+    window.dispatchEvent(event);
+  });
+  await page.getByRole("button", { name: "설정" }).click();
+  await page.getByRole("button", { name: "이 기기에 자격증봄 설치" }).click();
+  await expect(page.getByText("이 기기에 자격증봄이 설치되어 있어요.")).toBeVisible();
+});
+
+test("홈과 설정 패밀리 셸에서 브라우저 오류가 없다", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  page.on("pageerror", (error) => errors.push(error.message));
+
+  await page.goto("/");
+  await page.goto("/#settings");
+
+  expect(errors).toEqual([]);
+});
+
+test("320px에서 글자를 200%로 키워도 가로 넘침이 없다", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/");
+  const overflow = await page.evaluate(async () => {
+    document.documentElement.style.fontSize = "32px";
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+  });
+  expect(overflow).toBe(false);
+});

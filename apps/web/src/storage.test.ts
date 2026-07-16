@@ -1,9 +1,14 @@
 // 기기 저장 데이터가 손상돼도 앱이 안전하게 시작되는지 검증한다.
 import { renderHook, act } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import { useStoredIds } from "./storage";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { readStoredValue, useStoredIds, writeStoredValue } from "./storage";
 
 describe("기기 저장", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.clear();
+  });
+
   it("손상된 값은 빈 목록으로 복구한다", () => {
     window.localStorage.setItem("bad", "{");
     const { result } = renderHook(() => useStoredIds("bad"));
@@ -16,5 +21,29 @@ describe("기기 저장", () => {
     expect(result.current.ids).toEqual(["exam-1"]);
     act(() => result.current.toggle("exam-1"));
     expect(result.current.ids).toEqual([]);
+  });
+
+  it("localStorage 쓰기가 실패해도 화면 상태를 유지한다", () => {
+    const setItem = vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+    const { result } = renderHook(() => useStoredIds("write-failure"));
+
+    act(() => result.current.toggle("exam-1"));
+
+    expect(result.current.ids).toEqual(["exam-1"]);
+    expect(setItem).toHaveBeenCalled();
+  });
+
+  it("저장소 접근 오류를 null과 false로 격리한다", () => {
+    vi.spyOn(window.localStorage, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+
+    expect(readStoredValue("blocked")).toBeNull();
+    expect(writeStoredValue("blocked", "value")).toBe(false);
   });
 });

@@ -31,5 +31,9 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
+      - name: Android·iOS 네이티브 검증
+        run: pnpm --filter @certbom/mobile check
+      - name: Production dependency audit
+        run: pnpm audit:prod
       - run: pnpm --filter @certbom/web exec playwright install --with-deps chromium webkit
       - run: pnpm test:e2e
