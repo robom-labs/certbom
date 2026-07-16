@@ -11,9 +11,12 @@
 
 비밀값은 저장소, Actions 로그, 브라우저 번들에 기록하지 않는다.
 
+등록 뒤 `Source operations` workflow를 수동 실행한다. 첫 API 스냅샷은 기존 공식 공고와 한 번 대조하기 전에는 last-known-good로 승격하지 않는다. 첫 실행의 `REVIEW_REQUIRED` 이슈에서 건수·연도·fingerprint를 확인한 뒤 검토된 스냅샷을 정본으로 등록하면 이후 정상 diff는 자동 갱신된다.
+
 ## 공식 데이터 공개 기준
 
 - API 응답 스키마가 통과하고 일정의 시작과 종료가 뒤집히지 않아야 한다.
+- `resultCode=00`, pagination과 `totalCount`가 일치해야 한다.
 - 공식 코드 기반 안정 ID와 fingerprint가 생성돼야 한다.
 - 0건, 대량 삭제, 날짜의 과거 이동, 준비물 전면 변경, 출처 충돌은 `review_queue`로 보낸다.
 - `date-only`는 시각 마감 알림을 만들지 않고, `rolling`은 고정 D-day를 만들지 않는다.
@@ -24,6 +27,7 @@
 - HTTP 429는 `Retry-After`를 따르고 즉시 재시도하지 않는다.
 - Push 404와 410은 해당 기기를 폐기하고 같은 작업을 무한 재시도하지 않는다.
 - 배포 장애 시 Vercel의 직전 Production 배포를 Promote하고 원인 커밋을 revert한다.
+- scheduled workflow가 36시간 이상 성공하지 않으면 중앙 `robom` 운영 watchdog이 중복 없는 이슈 한 건으로 승격한다.
 
 ## 보존과 삭제
 

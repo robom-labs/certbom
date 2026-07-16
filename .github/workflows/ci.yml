@@ -30,6 +30,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+      - name: 공식 source registry와 400일 시간 이동 검사
+        run: pnpm source:verify && pnpm source:simulate
       - run: pnpm build
       - name: Android·iOS 네이티브 검증
         run: pnpm --filter @certbom/mobile check

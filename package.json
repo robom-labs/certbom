@@ -1,16 +1,20 @@
 {
   "name": "certbom",
   "private": true,
-  "version": "0.6.1",
+  "version": "0.6.2",
   "packageManager": "pnpm@9.15.9",
   "scripts": {
     "dev": "pnpm --filter @certbom/web dev",
     "typecheck": "pnpm -r typecheck",
     "lint": "biome lint .",
-    "test": "pnpm -r test",
+    "test": "pnpm -r test && pnpm test:ops",
+    "test:ops": "node --test scripts/*.test.mjs",
     "build": "pnpm -r build",
     "test:e2e": "pnpm --filter @certbom/web test:e2e",
-    "audit:prod": "node scripts/audit-production.mjs"
+    "audit:prod": "node scripts/audit-production.mjs",
+    "source:verify": "node scripts/source-operations.mjs verify",
+    "source:simulate": "node scripts/source-operations.mjs simulate",
+    "source:sync": "node scripts/source-operations.mjs sync"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.4"

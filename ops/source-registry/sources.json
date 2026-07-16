@@ -1,10 +1,33 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "dataVersion": "2026.07.16-v3",
   "lastReviewedAt": "2026-07-16T15:00:00+09:00",
+  "automation": {
+    "qnetSchedule": {
+      "sourceId": "qnet-public-schedule-api",
+      "endpoint": "https://apis.data.go.kr/B490007/qualExamSchd/getQualExamSchdList",
+      "secretName": "QNET_SERVICE_KEY",
+      "qualificationCodes": ["T", "S"],
+      "numOfRows": 100,
+      "maxPages": 20,
+      "timezone": "Asia/Seoul",
+      "schedule": "23 2 * * *",
+      "retryPolicy": {
+        "maxAttempts": 3,
+        "respectRetryAfter": true
+      },
+      "anomalyPolicy": {
+        "maxRemovalRatio": 0.25,
+        "maxBackwardShiftDays": 31
+      },
+      "firstSnapshotPolicy": "manual-review",
+      "fallback": "공식 공고 기반 last-known-good 유지"
+    }
+  },
   "sources": [
     {
       "sourceId": "qnet-technical-plan-2026",
+      "owner": "한국산업인력공단",
       "기관": "한국산업인력공단 Q-Net",
       "범위": "2026 국가기술자격 기사·산업기사 회차와 상시검정 종목",
       "dataMode": "official-notice-snapshot",
@@ -15,10 +38,15 @@
       "officialUrl": "https://www.q-net.or.kr/man004.do?ARTL_SEQ=5249930&BOARD_ID=Q001&gSite=Q&id=man00402&notiType=10",
       "applicationUrl": "https://www.q-net.or.kr/man001.do?gSite=Q",
       "lastVerifiedAt": "2026-07-16T15:00:00+09:00",
-      "parserVersion": "qnet-technical-manual-v2"
+      "parserVersion": "qnet-technical-manual-v2",
+      "freshnessSloHours": 24,
+      "staleAfterHours": 48,
+      "fallback": "마지막 검증 공고 스냅샷 유지",
+      "manualReviewConditions": ["0건", "대량 삭제", "공식 API와 공고 날짜 충돌"]
     },
     {
       "sourceId": "qnet-professional-calendar-2026",
+      "owner": "한국산업인력공단",
       "기관": "한국산업인력공단 Q-Net",
       "범위": "2026 국가전문자격 접수·빈자리·시험 일정",
       "dataMode": "official-pdf-snapshot",
@@ -29,10 +57,15 @@
       "officialUrl": "https://mo.q-net.or.kr/qnet_app/examCalendar.pdf",
       "applicationUrl": "https://www.q-net.or.kr/man001.do?gSite=Q",
       "lastVerifiedAt": "2026-07-16T15:00:00+09:00",
-      "parserVersion": "qnet-professional-pdf-v2"
+      "parserVersion": "qnet-professional-pdf-v2",
+      "freshnessSloHours": 24,
+      "staleAfterHours": 48,
+      "fallback": "마지막 검증 PDF 스냅샷 유지",
+      "manualReviewConditions": ["PDF hash 변경", "일정 전면 삭제", "공식 API와 날짜 충돌"]
     },
     {
       "sourceId": "historyexam-schedule-2026",
+      "owner": "국사편찬위원회",
       "기관": "국사편찬위원회",
       "범위": "한국사능력검정시험 제79회부터 제81회 접수·수험표·시험·발표",
       "dataMode": "official-notice-snapshot",
@@ -43,10 +76,15 @@
       "officialUrl": "https://www.historyexam.go.kr/pageLink.do?link=examSchedule",
       "applicationUrl": "https://www.historyexam.go.kr/",
       "lastVerifiedAt": "2026-07-16T15:00:00+09:00",
-      "parserVersion": "historyexam-manual-v2"
+      "parserVersion": "historyexam-manual-v2",
+      "freshnessSloHours": 24,
+      "staleAfterHours": 72,
+      "fallback": "마지막 검증 시행 일정 유지",
+      "manualReviewConditions": ["회차 수 변경", "접수·시험일 역전", "취소 공고"]
     },
     {
       "sourceId": "kdata-calendar-2026",
+      "owner": "한국데이터산업진흥원",
       "기관": "한국데이터산업진흥원",
       "범위": "빅데이터분석기사·ADP·ADsP·SQLP·SQLD·DAP·DAsP 일정",
       "dataMode": "official-page-snapshot",
@@ -57,10 +95,15 @@
       "officialUrl": "https://www.dataq.or.kr/www/accept/schedule.do",
       "applicationUrl": "https://www.dataq.or.kr/www/accept/schedule.do",
       "lastVerifiedAt": "2026-07-16T15:00:00+09:00",
-      "parserVersion": "kdata-manual-v1"
+      "parserVersion": "kdata-manual-v1",
+      "freshnessSloHours": 24,
+      "staleAfterHours": 72,
+      "fallback": "마지막 검증 일정과 공식 원문 링크 유지",
+      "manualReviewConditions": ["페이지 구조 변경", "시험명 누락", "일정 대량 변경"]
     },
     {
       "sourceId": "kpc-current-registration-2026",
+      "owner": "한국생산성본부",
       "기관": "한국생산성본부 자격",
       "범위": "ITQ·GTQ·ERP·AIBT·CAT·SW코딩·SMAT·AI-POT 현재 접수와 시험 일정",
       "dataMode": "official-page-snapshot",
@@ -71,10 +114,15 @@
       "officialUrl": "https://license.kpc.or.kr/nasec/rceptexmncnfirm/orgrcept/selectItemfx.do",
       "applicationUrl": "https://license.kpc.or.kr/index.do?gubun=main30",
       "lastVerifiedAt": "2026-07-16T15:00:00+09:00",
-      "parserVersion": "kpc-manual-v1"
+      "parserVersion": "kpc-manual-v1",
+      "freshnessSloHours": 24,
+      "staleAfterHours": 48,
+      "fallback": "마지막 검증 일정과 공식 접수처 유지",
+      "manualReviewConditions": ["현재 접수 0건", "페이지 구조 변경", "종목 대량 삭제"]
     },
     {
       "sourceId": "at-calendar-2026",
+      "owner": "한국공인회계사회",
       "기관": "한국공인회계사회",
       "범위": "FAT·TAT 제91회부터 제95회 접수·시험·발표",
       "dataMode": "official-page-snapshot",
@@ -85,10 +133,15 @@
       "officialUrl": "https://at.kicpa.or.kr/home/main_2026.jsp",
       "applicationUrl": "https://at.kicpa.or.kr/",
       "lastVerifiedAt": "2026-07-16T15:00:00+09:00",
-      "parserVersion": "at-manual-v1"
+      "parserVersion": "at-manual-v1",
+      "freshnessSloHours": 24,
+      "staleAfterHours": 72,
+      "fallback": "마지막 검증 FAT·TAT 회차 유지",
+      "manualReviewConditions": ["회차 누락", "시험일 역전", "페이지 구조 변경"]
     },
     {
       "sourceId": "korcham-calendar-2026",
+      "owner": "대한상공회의소",
       "기관": "대한상공회의소 자격평가사업단",
       "범위": "상시검정 종목과 비즈니스정보시각화·맞춤형화장품조제관리사 일정",
       "dataMode": "official-notice-snapshot",
@@ -99,10 +152,15 @@
       "officialUrl": "https://license.korcham.net/customer/noticeview.do?num=252526&pg=1&search=&word=",
       "applicationUrl": "https://license.korcham.net/",
       "lastVerifiedAt": "2026-07-16T15:00:00+09:00",
-      "parserVersion": "korcham-manual-v2"
+      "parserVersion": "korcham-manual-v2",
+      "freshnessSloHours": 24,
+      "staleAfterHours": 72,
+      "fallback": "마지막 검증 정기 일정과 상시 안내 유지",
+      "manualReviewConditions": ["정기·상시 유형 변경", "공지 삭제", "준비물 변경"]
     },
     {
       "sourceId": "gosi-announcement-2026",
+      "owner": "인사혁신처",
       "기관": "인사혁신처",
       "범위": "국가공무원 공개채용 시행 공고",
       "dataMode": "official-announcement-link",
@@ -113,7 +171,11 @@
       "officialUrl": "https://gongmuwon.gosi.kr/",
       "applicationUrl": "https://gongmuwon.gosi.kr/",
       "lastVerifiedAt": "2026-07-16T15:00:00+09:00",
-      "parserVersion": "gosi-link-v1"
+      "parserVersion": "gosi-link-v1",
+      "freshnessSloHours": 24,
+      "staleAfterHours": 72,
+      "fallback": "확정 날짜를 만들지 않고 최신 공식 시행 공고 링크 유지",
+      "manualReviewConditions": ["새 시행 공고", "변경·취소 공고", "공식 링크 변경"]
     }
   ],
   "apiStatus": {
