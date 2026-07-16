@@ -46,4 +46,16 @@ describe("기기 저장", () => {
     expect(readStoredValue("blocked")).toBeNull();
     expect(writeStoredValue("blocked", "value")).toBe(false);
   });
+
+  it("기존 키를 새 안정 ID로 이전하고 원본은 보존한다", () => {
+    window.localStorage.setItem("legacy", JSON.stringify(["old-id"]));
+    const { result } = renderHook(() => useStoredIds("next", {
+      migrateFromKey: "legacy",
+      migrate: (ids) => ids.map((id) => `new:${id}`),
+    }));
+
+    expect(result.current.ids).toEqual(["new:old-id"]);
+    expect(window.localStorage.getItem("legacy")).toBe(JSON.stringify(["old-id"]));
+    expect(window.localStorage.getItem("next")).toBe(JSON.stringify(["new:old-id"]));
+  });
 });

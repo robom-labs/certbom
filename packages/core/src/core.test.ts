@@ -7,9 +7,13 @@ import {
   eventRelevantUntil,
   exams,
   getExam,
+  getHomeSummaryExams,
   getUpcomingEventGroups,
   getUpcomingEvents,
   isApplicationOpen,
+  isApplicationUpcoming,
+  isExamUpcoming,
+  migratePreparationIds,
   recommend,
 } from "./index";
 
@@ -61,6 +65,43 @@ describe("시험 카탈로그", () => {
     const groups = getUpcomingEventGroups(new Date("2026-07-20T12:00:00+09:00"));
     const technicalRegistration = groups.find((item) => item.event.groupKey === "qnet-tech-r3-application");
     expect(technicalRegistration?.exams).toHaveLength(21);
+  });
+
+  it("홈 요약 필터가 전체·현재 접수·14일 안 시험을 같은 판정 함수로 계산한다", () => {
+    const now = new Date("2026-07-16T12:00:00+09:00");
+    const all = getHomeSummaryExams("all", now);
+    const open = getHomeSummaryExams("open", now);
+    const upcoming = getHomeSummaryExams("upcoming", now);
+
+    expect(all).toHaveLength(97);
+    expect(open.length).toBeGreaterThan(0);
+    expect(open.every((exam) => isApplicationOpen(exam, now))).toBe(true);
+    expect(upcoming.length).toBeGreaterThan(0);
+    expect(upcoming.every((exam) => isExamUpcoming(exam, now))).toBe(true);
+    const history = getExam("history-advanced");
+    if (!history) throw new Error("한국사 시험을 찾지 못했습니다.");
+    expect(isApplicationUpcoming(history, now)).toBe(true);
+  });
+
+  it("윤년 날짜 전용 일정은 KST 마지막 순간까지 유효하다", () => {
+    expect(eventRelevantUntil({
+      id: "leap-day",
+      examId: "test",
+      type: "exam",
+      title: "윤년 시험",
+      startAt: "2028-02-29T00:00:00+09:00",
+      timePrecision: "date-only",
+      officialSourceUrl: "https://example.com",
+      confirmed: true,
+    })).toBe(new Date("2028-02-29T23:59:59+09:00").getTime());
+  });
+
+  it("기존 준비물 체크 ID를 시험·버전별 안정 ID로 보존해 이전한다", () => {
+    expect(migratePreparationIds(["history-ticket", "information-engineer-identity-check", "missing"])).toEqual([
+      "history-advanced:history-v1:history-ticket",
+      "information-engineer:general-v1:official-check",
+    ]);
+    expect(exams.flatMap((exam) => exam.preparation).every((item) => item.id.split(":").length >= 3)).toBe(true);
   });
 });
 

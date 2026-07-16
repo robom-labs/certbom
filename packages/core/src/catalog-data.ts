@@ -2,7 +2,7 @@
 import type { ExamEventType, PreparationItem, ScheduleType, TimePrecision, TrustLevel } from "./model";
 
 export const CATALOG_UPDATED_AT = "2026-07-16T15:00:00+09:00";
-export const CATALOG_DATA_VERSION = "2026.07.16-v2";
+export const CATALOG_DATA_VERSION = "2026.07.16-v3";
 
 export type CatalogSource = {
   id: string;
@@ -24,7 +24,7 @@ export type EventSeed = {
   groupKey?: string;
 };
 
-type PreparationSeed = Omit<PreparationItem, "id" | "officialSourceUrl"> & {
+type PreparationSeed = Pick<PreparationItem, "category" | "label" | "detail" | "required"> & Partial<Omit<PreparationItem, "id" | "officialSourceUrl" | "category" | "label" | "detail" | "required">> & {
   id: string;
   officialSourceUrl?: string;
   preserveId?: boolean;
@@ -49,6 +49,7 @@ export type ExamSeed = {
   caution: string;
   events: EventSeed[];
   preparation?: PreparationSeed[];
+  preparationVersion?: string;
 };
 
 const QNET_APPLICATION_URL = "https://www.q-net.or.kr/man001.do?gSite=Q";
@@ -414,6 +415,7 @@ const historyExam = seed("history-advanced", "한국사능력검정시험", "한
   feeLabel: "심화 27,000원 · 기본 22,000원",
   caution: "회차별 시행 등급과 지역별 접수 시작 시각을 공식 공고에서 확인하세요.",
   events: historyEvents,
+  preparationVersion: "history-v1",
   preparation: [
     { id: "history-ticket", preserveId: true, category: "ticket", label: "수험표", detail: "본인 식별이 가능한 사진이 인쇄된 수험표", required: true },
     { id: "history-id", preserveId: true, category: "identity", label: "신분증", detail: "공식 응시요강에서 인정하는 신분증", required: true },

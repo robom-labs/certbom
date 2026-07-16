@@ -24,19 +24,41 @@ describe("로컬 알림 시각", () => {
   it("여유가 있으면 일정 하루 전에 예약한다", () => {
     const now = new Date("2026-08-01T00:00:00+09:00");
     const plan = createReminderPlan(
-      { startAt: "2026-08-10T10:00:00+09:00", title: "필기시험" },
+      { startAt: "2026-08-10T10:00:00+09:00", title: "필기시험", timePrecision: "exact" },
       now,
     );
 
-    expect(plan.date.toISOString()).toBe("2026-08-09T01:00:00.000Z");
-    expect(plan.isFallback).toBe(false);
+    expect(plan?.date.toISOString()).toBe("2026-08-09T01:00:00.000Z");
+    expect(plan?.isFallback).toBe(false);
   });
 
-  it("진행 중이거나 일정이 없으면 1분 뒤 확인 알림을 만든다", () => {
+  it("날짜 전용 일정은 전날 KST 오전 9시에 안내한다", () => {
     const now = new Date("2026-08-01T00:00:00+09:00");
-    const plan = createReminderPlan(undefined, now);
+    const plan = createReminderPlan(
+      { startAt: "2026-08-10T00:00:00+09:00", title: "필기시험", timePrecision: "date-only" },
+      now,
+    );
 
-    expect(plan.date.getTime()).toBe(now.getTime() + FALLBACK_REMINDER_DELAY_MS);
-    expect(plan.isFallback).toBe(true);
+    expect(plan?.date.toISOString()).toBe("2026-08-09T00:00:00.000Z");
+    expect(plan?.isFallback).toBe(false);
+  });
+
+  it("일정이 없거나 이미 지난 일정에는 임의 알림을 만들지 않는다", () => {
+    const now = new Date("2026-08-01T00:00:00+09:00");
+    expect(createReminderPlan(undefined, now)).toBeUndefined();
+    expect(createReminderPlan(
+      { startAt: "2026-07-31T10:00:00+09:00", title: "지난 시험", timePrecision: "exact" },
+      now,
+    )).toBeUndefined();
+  });
+
+  it("하루 전 시각이 지난 가까운 일정은 5분 뒤 재확인 안내로 제한한다", () => {
+    const now = new Date("2026-08-01T00:00:00+09:00");
+    const plan = createReminderPlan(
+      { startAt: "2026-08-01T12:00:00+09:00", title: "가까운 시험", timePrecision: "exact" },
+      now,
+    );
+    expect(plan?.date.getTime()).toBe(now.getTime() + FALLBACK_REMINDER_DELAY_MS);
+    expect(plan?.isFallback).toBe(true);
   });
 });

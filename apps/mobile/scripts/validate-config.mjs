@@ -9,7 +9,9 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-assert(packageInfo.version === "0.6.0", "모바일 버전은 0.6.0이어야 합니다.");
+assert(expo.version === packageInfo.version, "Expo와 모바일 package 버전이 일치해야 합니다.");
+assert(Number(expo.android.versionCode) >= 2, "Android versionCode는 2 이상이어야 합니다.");
+assert(Number(expo.ios.buildNumber) >= 2, "iOS buildNumber는 2 이상이어야 합니다.");
 assert(packageInfo.dependencies.expo.startsWith("~57.0."), "Expo SDK 57이 필요합니다.");
 assert(!packageInfo.dependencies["react-native-webview"], "WebView 의존성은 허용하지 않습니다.");
 assert(expo.scheme === "certbom", "scheme은 certbom이어야 합니다.");

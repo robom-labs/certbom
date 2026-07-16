@@ -7,6 +7,7 @@ export default defineConfig({
   use: { baseURL: "http://127.0.0.1:4703", trace: "retain-on-failure" },
   projects: [
     { name: "mobile", use: { ...devices["iPhone 13"], viewport: { width: 390, height: 844 } } },
+    { name: "webkit-mobile", use: { ...devices["iPhone 13"], browserName: "webkit", viewport: { width: 390, height: 844 } } },
     { name: "small-mobile", use: { ...devices["Desktop Chrome"], viewport: { width: 320, height: 568 } } },
     { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } },
   ],

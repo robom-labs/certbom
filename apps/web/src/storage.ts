@@ -18,18 +18,31 @@ export function writeStoredValue(key: string, value: string): boolean {
   }
 }
 
-export function useStoredIds(key: string) {
+function parseStoredIds(value: string | null) {
+  try {
+    const parsed: unknown = JSON.parse(value ?? "[]");
+    return Array.isArray(parsed) && parsed.every((item) => typeof item === "string") ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+type StoredIdOptions = {
+  migrateFromKey?: string;
+  migrate?: (ids: string[]) => string[];
+};
+
+export function useStoredIds(key: string, options: StoredIdOptions = {}) {
+  const [saveFailed, setSaveFailed] = useState(false);
   const [ids, setIds] = useState<string[]>(() => {
-    try {
-      const parsed: unknown = JSON.parse(readStoredValue(key) ?? "[]");
-      return Array.isArray(parsed) && parsed.every((item) => typeof item === "string") ? parsed : [];
-    } catch {
-      return [];
-    }
+    const current = readStoredValue(key);
+    if (current !== null) return parseStoredIds(current);
+    if (!options.migrateFromKey || !options.migrate) return [];
+    return options.migrate(parseStoredIds(readStoredValue(options.migrateFromKey)));
   });
 
   useEffect(() => {
-    writeStoredValue(key, JSON.stringify(ids));
+    setSaveFailed(!writeStoredValue(key, JSON.stringify(ids)));
   }, [ids, key]);
 
   const toggle = useCallback((id: string) => {
@@ -38,5 +51,5 @@ export function useStoredIds(key: string) {
 
   const clear = useCallback(() => setIds([]), []);
 
-  return { ids, toggle, clear };
+  return { ids, toggle, clear, saveFailed };
 }

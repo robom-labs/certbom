@@ -29,11 +29,17 @@ export type ExamEvent = {
 
 export type PreparationItem = {
   id: string;
-  category: "identity" | "ticket" | "writing" | "calculator" | "tool" | "clothing" | "document" | "forbidden" | "arrival";
+  category: "identity" | "ticket" | "writing" | "calculator" | "tool" | "clothing" | "document" | "forbidden" | "arrival" | "other";
   label: string;
   detail: string;
   required: boolean;
   officialSourceUrl: string;
+  importance: "required" | "recommended" | "forbidden";
+  stage: "all" | "written" | "practical" | "interview";
+  sourceVerified: boolean;
+  lastVerifiedAt: string;
+  preparationVersion: string;
+  legacyIds: string[];
 };
 
 export type Exam = {
@@ -61,7 +67,10 @@ export type Exam = {
   caution: string;
   events: ExamEvent[];
   preparation: PreparationItem[];
+  preparationVersion: string;
 };
+
+export type HomeSummaryFilter = "all" | "open" | "upcoming";
 
 export type RecommendationProfile = {
   goal: string;
