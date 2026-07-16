@@ -337,6 +337,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#f4f8f5",
   },
   listContent: {
+    width: "100%",
+    maxWidth: 900,
+    alignSelf: "center",
     paddingHorizontal: 18,
     paddingBottom: 40,
   },

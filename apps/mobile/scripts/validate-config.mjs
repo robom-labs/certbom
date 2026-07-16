@@ -10,6 +10,8 @@ function assert(condition, message) {
 }
 
 assert(expo.version === packageInfo.version, "Expo와 모바일 package 버전이 일치해야 합니다.");
+assert(expo.orientation === "default", "휴대폰·태블릿 회전을 모두 지원해야 합니다.");
+assert(expo.ios.supportsTablet === true, "iPad 지원이 켜져 있어야 합니다.");
 assert(Number(expo.android.versionCode) >= 2, "Android versionCode는 2 이상이어야 합니다.");
 assert(Number(expo.ios.buildNumber) >= 2, "iOS buildNumber는 2 이상이어야 합니다.");
 assert(packageInfo.dependencies.expo.startsWith("~57.0."), "Expo SDK 57이 필요합니다.");
