@@ -115,9 +115,30 @@ describe("시험 카탈로그", () => {
   it("기존 준비물 체크 ID를 시험·버전별 안정 ID로 보존해 이전한다", () => {
     expect(migratePreparationIds(["history-ticket", "information-engineer-identity-check", "missing"])).toEqual([
       "history-advanced:history-v1:history-ticket",
-      "information-engineer:general-v1:official-check",
+      "information-engineer:general-v2:identity-ready",
     ]);
     expect(exams.flatMap((exam) => exam.preparation).every((item) => item.id.split(":").length >= 3)).toBe(true);
+  });
+
+  it("공식 세부 목록이 없는 시험도 구체적인 일반 준비 체크리스트를 제공한다", () => {
+    const exam = getExam("information-engineer");
+    if (!exam) throw new Error("정보처리기사 시험을 찾지 못했습니다.");
+    expect(exam.preparation.length).toBeGreaterThanOrEqual(7);
+    expect(exam.preparation.every((item) => item.sourceType === "general" && item.sourceVerified === false)).toBe(true);
+    expect(exam.preparation.map((item) => item.category)).toEqual(expect.arrayContaining([
+      "identity",
+      "ticket",
+      "writing",
+      "tool",
+      "forbidden",
+      "arrival",
+    ]));
+  });
+
+  it("공식 준비물이 있는 시험은 일반 안내와 섞지 않는다", () => {
+    const exam = getExam("history-advanced");
+    if (!exam) throw new Error("한국사 시험을 찾지 못했습니다.");
+    expect(exam.preparation.every((item) => item.sourceType === "official" && item.sourceVerified)).toBe(true);
   });
 });
 

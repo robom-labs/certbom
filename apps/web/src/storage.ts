@@ -36,7 +36,10 @@ export function useStoredIds(key: string, options: StoredIdOptions = {}) {
   const [saveFailed, setSaveFailed] = useState(false);
   const [ids, setIds] = useState<string[]>(() => {
     const current = readStoredValue(key);
-    if (current !== null) return parseStoredIds(current);
+    if (current !== null) {
+      const parsed = parseStoredIds(current);
+      return options.migrate ? options.migrate(parsed) : parsed;
+    }
     if (!options.migrateFromKey || !options.migrate) return [];
     return options.migrate(parseStoredIds(readStoredValue(options.migrateFromKey)));
   });

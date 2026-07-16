@@ -1,12 +1,13 @@
 // 네 가지 핵심 화면으로 이동하는 모바일 하단 메뉴다.
 import { FamilyIcon, type FamilyIconName } from "./FamilyIcon";
 
-export type Tab = "home" | "find" | "schedule" | "settings";
+export type Tab = "home" | "find" | "calendar" | "schedule" | "settings";
 
 const tabs: Array<{ id: Tab; label: string; icon: FamilyIconName }> = [
   { id: "home", label: "홈", icon: "home" },
   { id: "find", label: "시험 찾기", icon: "search" },
-  { id: "schedule", label: "내 일정", icon: "calendar" },
+  { id: "calendar", label: "달력", icon: "calendar" },
+  { id: "schedule", label: "내 일정", icon: "bell" },
   { id: "settings", label: "설정", icon: "settings" },
 ];
 

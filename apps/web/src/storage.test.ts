@@ -58,4 +58,14 @@ describe("기기 저장", () => {
     expect(window.localStorage.getItem("legacy")).toBe(JSON.stringify(["old-id"]));
     expect(window.localStorage.getItem("next")).toBe(JSON.stringify(["new:old-id"]));
   });
+
+  it("현재 키에 남은 이전 버전 ID도 새 안정 ID로 다시 정규화한다", () => {
+    window.localStorage.setItem("current", JSON.stringify(["old-current-id"]));
+    const { result } = renderHook(() => useStoredIds("current", {
+      migrate: (ids) => ids.map((id) => `new:${id}`),
+    }));
+
+    expect(result.current.ids).toEqual(["new:old-current-id"]);
+    expect(window.localStorage.getItem("current")).toBe(JSON.stringify(["new:old-current-id"]));
+  });
 });

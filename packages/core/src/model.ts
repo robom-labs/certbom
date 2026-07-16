@@ -37,6 +37,8 @@ export type PreparationItem = {
   importance: "required" | "recommended" | "forbidden";
   stage: "all" | "written" | "practical" | "interview";
   sourceVerified: boolean;
+  sourceType: "official" | "cross-checked" | "general";
+  sourceLabel: string;
   lastVerifiedAt: string;
   preparationVersion: string;
   legacyIds: string[];

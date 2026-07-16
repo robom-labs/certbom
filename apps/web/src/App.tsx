@@ -7,16 +7,42 @@ import { usePwaInstall } from "./pwa-install";
 import { DetailScreen } from "./screens/DetailScreen";
 import { FindScreen } from "./screens/FindScreen";
 import { HomeScreen } from "./screens/HomeScreen";
+import {
+  CalendarScreen,
+  currentKstDateKey,
+  currentKstMonth,
+  type CalendarEventFilter,
+  type CalendarScope,
+  type CalendarState,
+} from "./screens/CalendarScreen";
 import { ScheduleScreen } from "./screens/ScheduleScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { useStoredIds } from "./storage";
 
 type Route =
-  | { kind: "tab"; tab: Tab; recommend?: boolean; homeFilter?: HomeSummaryFilter; findQuery?: string; findFilter?: string }
-  | { kind: "exam"; examId: string; from: Tab; homeFilter?: HomeSummaryFilter; findQuery?: string; findFilter?: string };
+  | {
+    kind: "tab";
+    tab: Tab;
+    recommend?: boolean;
+    homeFilter?: HomeSummaryFilter;
+    findQuery?: string;
+    findFilter?: string;
+    calendar?: CalendarState;
+  }
+  | {
+    kind: "exam";
+    examId: string;
+    from: Tab;
+    homeFilter?: HomeSummaryFilter;
+    findQuery?: string;
+    findFilter?: string;
+    calendar?: CalendarState;
+  };
 
-const tabs: Tab[] = ["home", "find", "schedule", "settings"];
+const tabs: Tab[] = ["home", "find", "calendar", "schedule", "settings"];
 const homeFilters: HomeSummaryFilter[] = ["all", "open", "upcoming"];
+const calendarScopes: CalendarScope[] = ["all", "saved"];
+const calendarEventFilters: CalendarEventFilter[] = ["all", "application", "exam", "result", "change"];
 
 function parseTab(value: string | null): Tab {
   return tabs.includes(value as Tab) ? value as Tab : "find";
@@ -38,6 +64,26 @@ function findHash(query: string, filter: string) {
   return search ? `find?${search}` : "find";
 }
 
+function calendarState(params = new URLSearchParams()): CalendarState {
+  const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(params.get("month") ?? "") ? params.get("month") as string : currentKstMonth();
+  const date = /^\d{4}-(0[1-9]|1[0-2])-\d{2}$/.test(params.get("date") ?? "") ? params.get("date") as string : currentKstDateKey();
+  const scope = calendarScopes.includes(params.get("scope") as CalendarScope) ? params.get("scope") as CalendarScope : "all";
+  const eventFilter = calendarEventFilters.includes(params.get("event") as CalendarEventFilter)
+    ? params.get("event") as CalendarEventFilter
+    : "all";
+  return { month, date, scope, eventFilter };
+}
+
+function calendarHash(state: CalendarState) {
+  const params = new URLSearchParams({
+    month: state.month,
+    date: state.date,
+    scope: state.scope,
+    event: state.eventFilter,
+  });
+  return `calendar?${params.toString()}`;
+}
+
 function readRoute(): Route {
   const value = window.location.hash.replace(/^#\/?/, "");
   const [path = "", query = ""] = value.split("?");
@@ -50,11 +96,13 @@ function readRoute(): Route {
       homeFilter: parseHomeFilter(params.get("filter")),
       findQuery: params.get("q") ?? "",
       findFilter: params.get("filter") ?? "all",
+      calendar: calendarState(params),
     };
   }
   if (path === "recommend") return { kind: "tab", tab: "find", recommend: true };
   if (path === "find") return { kind: "tab", tab: "find", findQuery: params.get("q") ?? "", findFilter: params.get("filter") ?? "all" };
   if (path === "home") return { kind: "tab", tab: "home", homeFilter: parseHomeFilter(params.get("filter")) };
+  if (path === "calendar") return { kind: "tab", tab: "calendar", calendar: calendarState(params) };
   if (tabs.includes(path as Tab)) return { kind: "tab", tab: path as Tab };
   return { kind: "tab", tab: "home", homeFilter: "open" };
 }
@@ -90,11 +138,21 @@ export function App() {
 
   const navigateTab = (tab: Tab, recommend = false, filter: HomeSummaryFilter = "open") => {
     if (recommend) trackFamilyEvent("recommendation_started", "home");
-    window.location.hash = recommend ? "recommend" : tab === "home" ? homeHash(filter) : tab;
+    window.location.hash = recommend
+      ? "recommend"
+      : tab === "home"
+        ? homeHash(filter)
+        : tab === "calendar"
+          ? calendarHash(calendarState())
+          : tab;
     window.scrollTo({ top: 0, behavior: "auto" });
   };
   const syncFindState = (query: string, filterId: string) => {
     window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#${findHash(query, filterId)}`);
+    setRoute(readRoute());
+  };
+  const syncCalendarState = (state: CalendarState) => {
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#${calendarHash(state)}`);
     setRoute(readRoute());
   };
   const openExam = (examId: string) => {
@@ -102,7 +160,14 @@ export function App() {
     const filter = route.kind === "tab" && route.tab === "home" ? route.homeFilter ?? "open" : route.homeFilter ?? "open";
     const findQuery = route.findQuery ?? "";
     const findFilter = route.findFilter ?? "all";
-    const originHash = from === "home" ? homeHash(filter) : from === "find" ? findHash(findQuery, findFilter) : from;
+    const currentCalendar = route.calendar ?? calendarState();
+    const originHash = from === "home"
+      ? homeHash(filter)
+      : from === "find"
+        ? findHash(findQuery, findFilter)
+        : from === "calendar"
+          ? calendarHash(currentCalendar)
+          : from;
     try {
       window.sessionStorage.setItem(`certbom-scroll:${originHash}`, String(window.scrollY));
     } catch {
@@ -114,6 +179,12 @@ export function App() {
       if (findQuery) params.set("q", findQuery);
       if (findFilter !== "all") params.set("filter", findFilter);
     }
+    if (from === "calendar") {
+      params.set("month", currentCalendar.month);
+      params.set("date", currentCalendar.date);
+      params.set("scope", currentCalendar.scope);
+      params.set("event", currentCalendar.eventFilter);
+    }
     trackFamilyEvent("exam_opened", `${from}-catalog`);
     window.location.hash = `exam/${examId}?${params.toString()}`;
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -123,7 +194,9 @@ export function App() {
       ? homeHash(examRoute.homeFilter ?? "open")
       : examRoute.from === "find"
         ? findHash(examRoute.findQuery ?? "", examRoute.findFilter ?? "all")
-        : examRoute.from;
+        : examRoute.from === "calendar"
+          ? calendarHash(examRoute.calendar ?? calendarState())
+          : examRoute.from;
     window.location.hash = target;
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
@@ -150,6 +223,7 @@ export function App() {
       return <DetailScreen exam={exam} favorite={favorites.ids.includes(exam.id)} checkedIds={checked.ids} storageError={checked.saveFailed} onBack={() => returnToOrigin(route)} onToggleFavorite={toggleFavorite} onToggleChecked={checked.toggle} />;
     }
     if (route.tab === "find") return <FindScreen favorites={favorites.ids} startRecommend={route.recommend} initialQuery={route.findQuery} initialFilter={route.findFilter} onStateChange={syncFindState} onOpen={openExam} onToggleFavorite={toggleFavorite} />;
+    if (route.tab === "calendar") return <CalendarScreen favoriteIds={favorites.ids} state={route.calendar ?? calendarState()} onStateChange={syncCalendarState} onFind={() => navigateTab("find")} onOpen={openExam} />;
     if (route.tab === "schedule") return <ScheduleScreen favoriteIds={favorites.ids} onFind={() => navigateTab("find")} onOpen={openExam} />;
     if (route.tab === "settings") return <SettingsScreen favoriteCount={favorites.ids.length} install={pwaInstall} updateReady={Boolean(applyUpdate)} onApplyUpdate={applyUpdate ?? undefined} onClear={() => { favorites.clear(); checked.clear(); }} />;
     return <HomeScreen selectedFilter={route.homeFilter ?? "open"} favorites={favorites.ids} onFilterChange={(filter) => navigateTab("home", false, filter)} onFind={() => navigateTab("find")} onRecommend={() => navigateTab("find", true)} onOpen={openExam} onToggleFavorite={toggleFavorite} />;

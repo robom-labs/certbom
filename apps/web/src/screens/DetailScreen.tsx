@@ -27,6 +27,11 @@ const categoryLabels: Record<PreparationItem["category"], string> = {
   other: "기타",
 };
 const categoryOrder = Object.keys(categoryLabels) as PreparationItem["category"][];
+const sourceTypeLabels: Record<PreparationItem["sourceType"], string> = {
+  official: "공식 확인",
+  "cross-checked": "교차 확인 참고",
+  general: "일반 준비",
+};
 
 function scheduleYearLabel(exam: Exam) {
   const years = [...new Set(exam.events.map((event) => new Intl.DateTimeFormat("en", {
@@ -45,7 +50,7 @@ export function DetailScreen({ exam, favorite, checkedIds, storageError, onBack,
   const groups = categoryOrder
     .map((category) => ({ category, items: exam.preparation.filter((item) => item.category === category) }))
     .filter((group) => group.items.length > 0);
-  const hasVerifiedPreparation = exam.preparation.some((item) => item.sourceVerified);
+  const hasOfficialPreparation = exam.preparation.some((item) => item.sourceType === "official");
 
   const downloadIcs = () => {
     if (!calendarEvent) return;
@@ -110,15 +115,15 @@ export function DetailScreen({ exam, favorite, checkedIds, storageError, onBack,
 
       <section className="detail-card preparation-card">
         <h2>시험 당일 준비</h2>
-        <p>필수 준비물을 빠짐없이 확인하고 이 기기에 체크해 두세요.</p>
+        <p>{hasOfficialPreparation ? "필수 준비물을 빠짐없이 확인하고 이 기기에 체크해 두세요." : "공식 세부 목록을 기다리는 동안 지금 먼저 챙길 수 있는 일반 준비를 확인하세요."}</p>
         <div className="preparation-progress" role="status" aria-label={`준비물 ${exam.preparation.length}개 중 ${checkedCount}개 완료`}>
           <div><strong>전체 {exam.preparation.length}개</strong><span>완료 {checkedCount}개 · 필수 미완료 {requiredIncomplete}개</span></div>
           <progress max={Math.max(exam.preparation.length, 1)} value={checkedCount}>{checkedCount}개 완료</progress>
         </div>
-        {!hasVerifiedPreparation && (
+        {!hasOfficialPreparation && (
           <div className="preparation-unverified" role="status">
-            <strong>아직 공식 세부 준비물을 항목별로 확인하지 못했어요.</strong>
-            <p>일반 안내를 공식 목록처럼 단정하지 않고, 최신 응시요강으로 바로 연결합니다.</p>
+            <strong>공식 세부 준비물은 확인 중이지만, 빈손으로 돌려보내지 않아요.</strong>
+            <p>아래 {exam.preparation.length}개는 여러 시험에 공통으로 도움이 되는 일반 준비예요. 확정 준비물·허용 기종·입실 시각은 공식 원문을 함께 확인하세요.</p>
           </div>
         )}
         {storageError && <p className="storage-error" role="alert">체크 상태를 기기에 저장하지 못했어요. 현재 화면에서는 유지되지만 새로고침 전 공식 목록을 다시 확인해 주세요.</p>}
@@ -132,12 +137,14 @@ export function DetailScreen({ exam, favorite, checkedIds, storageError, onBack,
                   <span>
                     <strong>
                       {item.label}
-                      <em className={`importance-${item.sourceVerified ? item.importance : "unverified"}`}>
-                        {item.sourceVerified ? item.importance === "required" ? "필수" : item.importance === "forbidden" ? "금지" : "권장" : "공식 확인 필요"}
+                      <em className={`importance-${item.sourceType === "general" ? "general" : item.sourceType === "cross-checked" ? "cross-checked" : item.importance}`}>
+                        {item.sourceType === "official"
+                          ? item.importance === "required" ? "필수" : item.importance === "forbidden" ? "금지" : "권장"
+                          : sourceTypeLabels[item.sourceType]}
                       </em>
                     </strong>
                     <small>{item.detail}</small>
-                    <small className="preparation-meta">{item.stage === "all" ? "전 단계" : item.stage === "written" ? "필기" : item.stage === "practical" ? "실기" : "면접"} · 기준 {item.preparationVersion} · 마지막 확인 {new Date(item.lastVerifiedAt).toLocaleDateString("ko-KR")}</small>
+                    <small className="preparation-meta">{item.stage === "all" ? "전 단계" : item.stage === "written" ? "필기" : item.stage === "practical" ? "실기" : "면접"} · {item.sourceLabel} · 기준 {item.preparationVersion} · 마지막 확인 {new Date(item.lastVerifiedAt).toLocaleDateString("ko-KR")}</small>
                   </span>
                 </label>
               ))}
