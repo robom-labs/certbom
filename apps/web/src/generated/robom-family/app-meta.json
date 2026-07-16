@@ -4,14 +4,14 @@
   "name": "자격증봄",
   "englishName": "CertBom",
   "repo": "robom-labs/certbom",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "webUrl": "https://certbom.vercel.app/",
   "stableInstallUrl": "https://robom.kr/get/certbom",
   "privacyUrl": "https://robom.kr/privacy/certbom",
   "supportUrl": "https://robom.kr/support",
   "deployProvider": "vercel",
   "familySpecVersion": "1.0.0",
-  "lastVerifiedAt": "2026-07-16T10:43:35+09:00",
+  "lastVerifiedAt": "2026-07-16T18:13:31+09:00",
   "familyApps": [
     {
       "id": "outbom",
