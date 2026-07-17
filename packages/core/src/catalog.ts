@@ -78,9 +78,105 @@ const genericPreparation = (examId: string, source: string, practical: boolean):
   ];
 };
 
+// 출처 계열별로 공식 규정을 웹에서 직접 확인한 준비물 기준선(2026-07-17).
+// - Q-Net 원서접수 유의사항(신분증 미지참 시 당해 시험 정지·무효, 전자·통신기기 소지·착용만으로 무효):
+//   https://www.q-net.or.kr/rcv002.do?id=rcv002_baseInfo&gSite=Q&gId=
+// - Q-Net 공학용계산기 허용군·초기화 규정: https://q-net.or.kr/rcv002.do?gId=&gSite=Q&id=rcv002_calculator
+// - Q-Net 수험자 지참 준비물 조회(실기 종목별): https://www.q-net.or.kr/rcv013.do?id=rcv01312&gSite=Q&gId=
+// - 데이터자격검정 응시자 유의사항(신분증, 검정색 사인펜·볼펜, 전자기기 소지·착용만으로 무효):
+//   https://dataq.or.kr/www/accept/warning.do
+// - 대한상공회의소 시험 안내(신분증·수험표 미지참 시 응시 불가): https://license.korcham.net/ex/examInfo1.do
+const SOURCE_PREPARATION_VERSION = "source-official-v1";
+const QNET_CALCULATOR_URL = "https://q-net.or.kr/rcv002.do?gId=&gSite=Q&id=rcv002_calculator";
+const QNET_ITEMS_URL = "https://www.q-net.or.kr/rcv013.do?id=rcv01312&gSite=Q&gId=";
+const KDATA_WARNING_URL = "https://dataq.or.kr/www/accept/warning.do";
+const KORCHAM_INFO_URL = "https://license.korcham.net/ex/examInfo1.do";
+
+type SourceFamily = "qnet" | "kdata" | "korcham";
+
+const SOURCE_FAMILY_BY_ID: Record<string, SourceFamily> = {
+  "qnet-technical-plan-2026": "qnet",
+  "qnet-professional-calendar-2026": "qnet",
+  "kdata-calendar-2026": "kdata",
+  "korcham-calendar-2026": "korcham",
+};
+
+type PrepDraft = {
+  id: string;
+  category: PreparationItem["category"];
+  label: string;
+  detail: string;
+  importance: PreparationItem["importance"];
+  stage?: PreparationItem["stage"];
+  sourceUrl: string;
+  // 이전 general-v2 체크리스트에서 대응되는 항목 id(사용자 체크 이전 보존용)
+  legacyOf?: string;
+};
+
+function sourcePreparation(examId: string, family: SourceFamily, officialUrl: string, practical: boolean): PreparationItem[] {
+  const sourceLabelByFamily: Record<SourceFamily, string> = {
+    qnet: "Q-Net 원서접수 유의사항",
+    kdata: "데이터자격검정 응시자 유의사항",
+    korcham: "대한상공회의소 시험 안내",
+  };
+  const drafts: PrepDraft[] = [];
+  if (family === "qnet") {
+    drafts.push(
+      { id: "identity", category: "identity", label: "공단 인정 신분증", detail: "미지참 시 당해 시험이 정지(퇴실)·무효 처리돼요. 인정 신분증 범위를 원서접수 유의사항에서 확인하세요.", importance: "required", sourceUrl: officialUrl, legacyOf: "identity-ready" },
+      { id: "ticket", category: "ticket", label: "수험표", detail: "Q-Net에서 출력해 지참하세요. 시험 일시·장소·입실 시각이 적혀 있어요.", importance: "required", sourceUrl: officialUrl, legacyOf: "ticket-check" },
+      { id: "black-pen", category: "writing", label: "흑색 볼펜류 필기구", detail: "답안·서명 작성용으로 준비하세요. 여분 한 개를 함께 챙기면 좋아요.", importance: "required", sourceUrl: officialUrl, legacyOf: "writing-check" },
+      { id: "calculator", category: "calculator", label: "공학용 계산기(허용군 기종만)", detail: "계산기가 필요한 종목은 허용군 기종만 초기화(리셋) 후 쓸 수 있어요. 직접 초기화가 안 되는 기종은 사용 불가라 허용 목록을 꼭 확인하세요.", importance: "recommended", sourceUrl: QNET_CALCULATOR_URL },
+      { id: "prohibited", category: "forbidden", label: "전자·통신기기 반입 금지", detail: "휴대전화·스마트워치 등은 사용하지 않아도 소지·착용만으로 당해 시험이 정지·무효 처리돼요.", importance: "forbidden", sourceUrl: officialUrl, legacyOf: "prohibited-check" },
+    );
+    if (practical) {
+      drafts.push({ id: "practical-tools", category: "tool", label: "실기 종목별 지참 준비물", detail: "실기 지참물은 종목·회차마다 달라요. Q-Net 수험자 지참 준비물 조회에서 종목명으로 확인하세요.", importance: "required", stage: "practical", sourceUrl: QNET_ITEMS_URL, legacyOf: "practical-tools-check" });
+    }
+  } else if (family === "kdata") {
+    drafts.push(
+      { id: "identity", category: "identity", label: "규정 신분증", detail: "규정 신분증이 없으면 응시할 수 없어요. 인정 범위를 응시자 유의사항에서 확인하세요.", importance: "required", sourceUrl: KDATA_WARNING_URL, legacyOf: "identity-ready" },
+      { id: "ticket", category: "ticket", label: "수험표", detail: "시험 중에는 수험표를 포함한 소지품을 가방에 넣거나 책상 아래에 두어야 해요.", importance: "required", sourceUrl: KDATA_WARNING_URL, legacyOf: "ticket-check" },
+      { id: "black-pen", category: "writing", label: "검정색 컴퓨터용 사인펜·검정 볼펜", detail: "필기 답안은 검정색만 인정돼요. 연필·유색펜은 판독 불가 시 0점 처리될 수 있어요. (실기는 필기구도 책상 위에 둘 수 없어요)", importance: "required", sourceUrl: KDATA_WARNING_URL, legacyOf: "writing-check" },
+      { id: "prohibited", category: "forbidden", label: "전자·통신기기 반입 금지", detail: "휴대전화·스마트워치 등은 사용 여부와 관계없이 소지·착용만으로 해당 시험이 중지·무효 처리돼요.", importance: "forbidden", sourceUrl: KDATA_WARNING_URL, legacyOf: "prohibited-check" },
+    );
+  } else {
+    drafts.push(
+      { id: "identity", category: "identity", label: "신분증", detail: "시험 당일 신분증을 지참하고 책상 위에 꺼내 두세요. 미지참 시 응시할 수 없어요.", importance: "required", sourceUrl: KORCHAM_INFO_URL, legacyOf: "identity-ready" },
+      { id: "ticket", category: "ticket", label: "수험표", detail: "신분증과 함께 반드시 지참하세요. 미지참 시 응시할 수 없어요.", importance: "required", sourceUrl: KORCHAM_INFO_URL, legacyOf: "ticket-check" },
+    );
+  }
+  const items: PreparationItem[] = drafts.map((draft) => ({
+    id: `${examId}:${SOURCE_PREPARATION_VERSION}:${draft.id}`,
+    category: draft.category,
+    label: draft.label,
+    detail: draft.detail,
+    required: draft.importance === "required",
+    officialSourceUrl: draft.sourceUrl,
+    importance: draft.importance,
+    stage: draft.stage ?? "all",
+    sourceVerified: true,
+    sourceType: "official",
+    sourceLabel: sourceLabelByFamily[family],
+    lastVerifiedAt: CATALOG_UPDATED_AT,
+    preparationVersion: SOURCE_PREPARATION_VERSION,
+    legacyIds: [
+      ...(draft.category === "identity" ? [`${examId}-identity-check`, `${examId}:general-v1:official-check`] : []),
+      ...(draft.legacyOf ? [`${examId}:general-v2:${draft.legacyOf}`] : []),
+    ],
+  }));
+  // 입실 안내와 최종 확인은 일반 안내로 덧붙여, 검증 항목과 안내 항목을 구분한다.
+  const generic = genericPreparation(examId, officialUrl, false);
+  const arrival = generic.find((item) => item.category === "arrival");
+  const finalCheck = generic.find((item) => item.id.endsWith(":official-final-check"));
+  if (arrival) items.push(arrival);
+  if (finalCheck) items.push(finalCheck);
+  return items;
+}
+
 export const exams: Exam[] = examSeeds.map((seed) => {
   const officialUrl = seed.source.officialUrl;
-  const preparationVersion = seed.preparationVersion ?? (seed.preparation ? `${seed.id}-v1` : GENERIC_PREPARATION_VERSION);
+  const sourceFamily = SOURCE_FAMILY_BY_ID[seed.source.id];
+  const preparationVersion = seed.preparationVersion
+    ?? (seed.preparation ? `${seed.id}-v1` : sourceFamily ? SOURCE_PREPARATION_VERSION : GENERIC_PREPARATION_VERSION);
   return {
     id: seed.id,
     slug: seed.id,
@@ -126,7 +222,9 @@ export const exams: Exam[] = examSeeds.map((seed) => {
         ...(item.legacyIds ?? []),
         preserveId ? item.id : `${seed.id}-${item.id}`,
       ],
-    })) ?? genericPreparation(seed.id, officialUrl, seed.practical),
+    })) ?? (sourceFamily
+      ? sourcePreparation(seed.id, sourceFamily, officialUrl, seed.practical)
+      : genericPreparation(seed.id, officialUrl, seed.practical)),
     preparationVersion,
   };
 });

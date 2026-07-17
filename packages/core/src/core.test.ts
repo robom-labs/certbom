@@ -113,16 +113,23 @@ describe("시험 카탈로그", () => {
   });
 
   it("기존 준비물 체크 ID를 시험·버전별 안정 ID로 보존해 이전한다", () => {
-    expect(migratePreparationIds(["history-ticket", "information-engineer-identity-check", "missing"])).toEqual([
-      "history-advanced:history-v1:history-ticket",
+    // 이전 general-v1 official-check와 general-v2 identity-ready가 모두 현재 출처 검증 ID로 이어져야 한다.
+    expect(migratePreparationIds([
+      "history-ticket",
+      "information-engineer-identity-check",
       "information-engineer:general-v2:identity-ready",
+      "missing",
+    ])).toEqual([
+      "history-advanced:history-v1:history-ticket",
+      "information-engineer:source-official-v1:identity",
     ]);
     expect(exams.flatMap((exam) => exam.preparation).every((item) => item.id.split(":").length >= 3)).toBe(true);
   });
 
-  it("공식 세부 목록이 없는 시험도 구체적인 일반 준비 체크리스트를 제공한다", () => {
-    const exam = getExam("information-engineer");
-    if (!exam) throw new Error("정보처리기사 시험을 찾지 못했습니다.");
+  it("공식 확인 출처가 없는 시험도 구체적인 일반 준비 체크리스트를 제공한다", () => {
+    // ITQ는 별도 출처 규정을 웹에서 확인하지 않아 일반 체크리스트로 안내한다.
+    const exam = getExam("itq");
+    if (!exam) throw new Error("ITQ 시험을 찾지 못했습니다.");
     expect(exam.preparation.length).toBeGreaterThanOrEqual(7);
     expect(exam.preparation.every((item) => item.sourceType === "general" && item.sourceVerified === false)).toBe(true);
     expect(exam.preparation.map((item) => item.category)).toEqual(expect.arrayContaining([
@@ -135,10 +142,27 @@ describe("시험 카탈로그", () => {
     ]));
   });
 
-  it("공식 준비물이 있는 시험은 일반 안내와 섞지 않는다", () => {
+  it("Q-Net·데이터·상의 시험은 웹에서 확인한 공식 준비물을 제공한다", () => {
+    for (const id of ["information-engineer", "sqld", "computer-specialist-1"]) {
+      const exam = getExam(id);
+      if (!exam) continue;
+      const official = exam.preparation.filter((item) => item.sourceType === "official" && item.sourceVerified);
+      expect(official.length).toBeGreaterThanOrEqual(2);
+      // 신분증 항목은 공식 출처 URL을 갖는다.
+      const identity = official.find((item) => item.category === "identity");
+      expect(identity?.officialSourceUrl).toMatch(/^https?:\/\//);
+      expect(identity?.required).toBe(true);
+    }
+  });
+
+  it("공식 준비물이 있는 시험은 검증 항목과 일반 안내를 섞더라도 검증 항목이 존재한다", () => {
     const exam = getExam("history-advanced");
     if (!exam) throw new Error("한국사 시험을 찾지 못했습니다.");
     expect(exam.preparation.every((item) => item.sourceType === "official" && item.sourceVerified)).toBe(true);
+    // Q-Net 시험은 공식 검증 항목 + 입실/최종확인 일반 안내를 함께 제공한다.
+    const qnet = getExam("information-engineer");
+    expect(qnet?.preparation.some((item) => item.sourceType === "official")).toBe(true);
+    expect(qnet?.preparation.some((item) => item.category === "arrival")).toBe(true);
   });
 });
 
