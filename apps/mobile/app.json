@@ -2,7 +2,7 @@
   "expo": {
     "name": "자격증봄",
     "slug": "certbom",
-    "version": "0.7.1",
+    "version": "0.7.2",
     "description": "97개 시험을 오프라인에서 찾고 공식 일정·관심 시험·준비 알림을 확인하는 자격증봄",
     "platforms": [
       "ios",

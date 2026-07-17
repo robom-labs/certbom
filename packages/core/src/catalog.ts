@@ -86,19 +86,27 @@ const genericPreparation = (examId: string, source: string, practical: boolean):
 // - 데이터자격검정 응시자 유의사항(신분증, 검정색 사인펜·볼펜, 전자기기 소지·착용만으로 무효):
 //   https://dataq.or.kr/www/accept/warning.do
 // - 대한상공회의소 시험 안내(신분증·수험표 미지참 시 응시 불가): https://license.korcham.net/ex/examInfo1.do
+// - 한국생산성본부(KPC) 수험자 유의사항(신분증+수험표 필수, 미지참 시 응시 불가·환불 불가, 대학생 학생증 불인정, 사진 부착 수험표):
+//   https://license.kpc.or.kr/nasec/cstmrcnter/useinfo/selectExnstnotice.do
+// - 한국공인회계사회 AT자격시험 준비물·유효 신분증(신분증·수험표·필기구·일반계산기, 부정행위 시 2년 정지):
+//   https://at.kicpa.or.kr/home/help/help02001v.jsp?bbs_sno=600
 const SOURCE_PREPARATION_VERSION = "source-official-v1";
 const QNET_CALCULATOR_URL = "https://q-net.or.kr/rcv002.do?gId=&gSite=Q&id=rcv002_calculator";
 const QNET_ITEMS_URL = "https://www.q-net.or.kr/rcv013.do?id=rcv01312&gSite=Q&gId=";
 const KDATA_WARNING_URL = "https://dataq.or.kr/www/accept/warning.do";
 const KORCHAM_INFO_URL = "https://license.korcham.net/ex/examInfo1.do";
+const KPC_NOTICE_URL = "https://license.kpc.or.kr/nasec/cstmrcnter/useinfo/selectExnstnotice.do";
+const AT_ITEMS_URL = "https://at.kicpa.or.kr/home/help/help02001v.jsp?bbs_sno=600";
 
-type SourceFamily = "qnet" | "kdata" | "korcham";
+type SourceFamily = "qnet" | "kdata" | "korcham" | "kpc" | "at";
 
 const SOURCE_FAMILY_BY_ID: Record<string, SourceFamily> = {
   "qnet-technical-plan-2026": "qnet",
   "qnet-professional-calendar-2026": "qnet",
   "kdata-calendar-2026": "kdata",
   "korcham-calendar-2026": "korcham",
+  "kpc-current-registration-2026": "kpc",
+  "at-calendar-2026": "at",
 };
 
 type PrepDraft = {
@@ -118,6 +126,8 @@ function sourcePreparation(examId: string, family: SourceFamily, officialUrl: st
     qnet: "Q-Net 원서접수 유의사항",
     kdata: "데이터자격검정 응시자 유의사항",
     korcham: "대한상공회의소 시험 안내",
+    kpc: "KPC 수험자 유의사항",
+    at: "AT자격시험 준비물 안내",
   };
   const drafts: PrepDraft[] = [];
   if (family === "qnet") {
@@ -137,6 +147,19 @@ function sourcePreparation(examId: string, family: SourceFamily, officialUrl: st
       { id: "ticket", category: "ticket", label: "수험표", detail: "시험 중에는 수험표를 포함한 소지품을 가방에 넣거나 책상 아래에 두어야 해요.", importance: "required", sourceUrl: KDATA_WARNING_URL, legacyOf: "ticket-check" },
       { id: "black-pen", category: "writing", label: "검정색 컴퓨터용 사인펜·검정 볼펜", detail: "필기 답안은 검정색만 인정돼요. 연필·유색펜은 판독 불가 시 0점 처리될 수 있어요. (실기는 필기구도 책상 위에 둘 수 없어요)", importance: "required", sourceUrl: KDATA_WARNING_URL, legacyOf: "writing-check" },
       { id: "prohibited", category: "forbidden", label: "전자·통신기기 반입 금지", detail: "휴대전화·스마트워치 등은 사용 여부와 관계없이 소지·착용만으로 해당 시험이 중지·무효 처리돼요.", importance: "forbidden", sourceUrl: KDATA_WARNING_URL, legacyOf: "prohibited-check" },
+    );
+  } else if (family === "kpc") {
+    drafts.push(
+      { id: "identity", category: "identity", label: "규정 신분증(원본)", detail: "주민등록증·운전면허증·여권·공무원증·청소년증 등 원본만 인정돼요. 대학생 학생증은 인정 안 되고, 미지참 시 응시·환불이 안 되니 꼭 챙기세요.", importance: "required", sourceUrl: KPC_NOTICE_URL, legacyOf: "identity-ready" },
+      { id: "ticket", category: "ticket", label: "사진이 부착된 수험표", detail: "사진이 등록·출력된 수험표여야 해요. 사진 미등록·미부착이면 응시할 수 없어요.", importance: "required", sourceUrl: KPC_NOTICE_URL, legacyOf: "ticket-check" },
+    );
+  } else if (family === "at") {
+    drafts.push(
+      { id: "identity", category: "identity", label: "유효한 신분증", detail: "주민등록증·운전면허증·여권·청소년증·고교 학생증·공무원증 등이 인정돼요. 대면·비대면에 따라 인정 범위가 조금 달라 준비물 안내에서 확인하세요.", importance: "required", sourceUrl: AT_ITEMS_URL, legacyOf: "identity-ready" },
+      { id: "ticket", category: "ticket", label: "수험표(대면 시험)", detail: "대면 시험은 수험표를 지참하세요. 비대면은 안내 절차를 따르면 돼요.", importance: "required", sourceUrl: AT_ITEMS_URL, legacyOf: "ticket-check" },
+      { id: "writing", category: "writing", label: "필기구", detail: "답안·메모용 필기구를 준비하세요.", importance: "required", sourceUrl: AT_ITEMS_URL, legacyOf: "writing-check" },
+      { id: "calculator", category: "calculator", label: "일반계산기", detail: "회계·세무 계산용 일반계산기를 지참하세요(공학용·프로그램 계산기 아님).", importance: "recommended", sourceUrl: AT_ITEMS_URL },
+      { id: "prohibited", category: "forbidden", label: "부정행위 주의", detail: "부정행위가 적발되면 이후 2년간 AT자격시험 응시가 정지돼요. 전자기기 사용 규정을 지키세요.", importance: "forbidden", sourceUrl: AT_ITEMS_URL, legacyOf: "prohibited-check" },
     );
   } else {
     drafts.push(

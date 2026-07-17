@@ -127,16 +127,15 @@ describe("시험 카탈로그", () => {
   });
 
   it("공식 확인 출처가 없는 시험도 구체적인 일반 준비 체크리스트를 제공한다", () => {
-    // ITQ는 별도 출처 규정을 웹에서 확인하지 않아 일반 체크리스트로 안내한다.
-    const exam = getExam("itq");
-    if (!exam) throw new Error("ITQ 시험을 찾지 못했습니다.");
-    expect(exam.preparation.length).toBeGreaterThanOrEqual(7);
+    // 사이버국가고시센터(gosi) 시험은 출처별 규정을 웹에서 확인하지 않아 일반 체크리스트로 안내한다.
+    const exam = getExam("national-civil-service-9");
+    if (!exam) throw new Error("국가공무원 9급 시험을 찾지 못했습니다.");
+    expect(exam.preparation.length).toBeGreaterThanOrEqual(6);
     expect(exam.preparation.every((item) => item.sourceType === "general" && item.sourceVerified === false)).toBe(true);
     expect(exam.preparation.map((item) => item.category)).toEqual(expect.arrayContaining([
       "identity",
       "ticket",
       "writing",
-      "tool",
       "forbidden",
       "arrival",
     ]));
