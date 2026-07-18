@@ -29,7 +29,9 @@ function normalize(value: string) {
 function formatEventDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "공식 일정 확인 필요";
-  return date.toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" });
+  // date-only 이벤트 startAt은 자정 KST(+09:00)라 timeZone을 지정하지 않으면
+  // KST보다 서쪽 기기(UTC·미주 등)에서 시험일이 하루 전날로 표시된다.
+  return date.toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Seoul" });
 }
 
 function formatReminderDate(value: Date) {
