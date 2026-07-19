@@ -1,0 +1,40 @@
+name: Official Source Monitor
+
+# Read-only monitor: fetches each official exam source and records HTTP status +
+# SHA-256 of the body into ops/source-registry/source-hashes.json. No secrets,
+# public URLs only. Commits the snapshot back only when it changes.
+
+on:
+  schedule:
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run source monitor
+        run: node scripts/monitor-sources.mjs
+
+      - name: Commit updated source-hashes.json if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain ops/source-registry/source-hashes.json)" ]; then
+            git add ops/source-registry/source-hashes.json
+            git commit -m "chore: update official-source content hashes"
+            git push
+          else
+            echo "No source-hashes.json changes to commit."
+          fi
