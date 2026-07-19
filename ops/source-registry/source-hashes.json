@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-19T08:09:53.263Z",
+  "sources": [
+    {
+      "sourceId": "qnet-technical-plan-2026",
+      "url": "https://www.q-net.or.kr/man004.do?ARTL_SEQ=5249930&BOARD_ID=Q001&gSite=Q&id=man00402&notiType=10",
+      "httpStatus": 403,
+      "ok": false,
+      "contentLength": 102,
+      "contentSha256": null,
+      "checkedAt": "2026-07-19T08:09:53.263Z"
+    },
+    {
+      "sourceId": "qnet-professional-calendar-2026",
+      "url": "https://mo.q-net.or.kr/qnet_app/examCalendar.pdf",
+      "httpStatus": 403,
+      "ok": false,
+      "contentLength": 101,
+      "contentSha256": null,
+      "checkedAt": "2026-07-19T08:09:53.263Z"
+    },
+    {
+      "sourceId": "historyexam-schedule-2026",
+      "url": "https://www.historyexam.go.kr/pageLink.do?link=examSchedule",
+      "httpStatus": 403,
+      "ok": false,
+      "contentLength": 108,
+      "contentSha256": null,
+      "checkedAt": "2026-07-19T08:09:53.263Z"
+    },
+    {
+      "sourceId": "kdata-calendar-2026",
+      "url": "https://www.dataq.or.kr/www/accept/schedule.do",
+      "httpStatus": 403,
+      "ok": false,
+      "contentLength": 102,
+      "contentSha256": null,
+      "checkedAt": "2026-07-19T08:09:53.263Z"
+    },
+    {
+      "sourceId": "kpc-current-registration-2026",
+      "url": "https://license.kpc.or.kr/nasec/rceptexmncnfirm/orgrcept/selectItemfx.do",
+      "httpStatus": 403,
+      "ok": false,
+      "contentLength": 104,
+      "contentSha256": null,
+      "checkedAt": "2026-07-19T08:09:53.263Z"
+    },
+    {
+      "sourceId": "at-calendar-2026",
+      "url": "https://at.kicpa.or.kr/home/main_2026.jsp",
+      "httpStatus": 403,
+      "ok": false,
+      "contentLength": 101,
+      "contentSha256": null,
+      "checkedAt": "2026-07-19T08:09:53.263Z"
+    },
+    {
+      "sourceId": "korcham-calendar-2026",
+      "url": "https://license.korcham.net/customer/noticeview.do?num=252526&pg=1&search=&word=",
+      "httpStatus": 403,
+      "ok": false,
+      "contentLength": 106,
+      "contentSha256": null,
+      "checkedAt": "2026-07-19T08:09:53.263Z"
+    },
+    {
+      "sourceId": "gosi-announcement-2026",
+      "url": "https://gongmuwon.gosi.kr/",
+      "httpStatus": 403,
+      "ok": false,
+      "contentLength": 104,
+      "contentSha256": null,
+      "checkedAt": "2026-07-19T08:09:53.263Z"
+    }
+  ]
+}
