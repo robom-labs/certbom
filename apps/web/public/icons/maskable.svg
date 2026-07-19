@@ -1,7 +1,6 @@
-<!-- 마스커블 안전 영역을 확보한 자격증봄 앱 아이콘이다. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <title>자격증봄 마스커블 앱 아이콘</title>
-  <rect width="512" height="512" fill="#2457ef"/>
-  <path d="M151 143c0-19 15-34 34-34h142c19 0 34 15 34 34v226c0 13-14 21-25 14l-80-52-80 52c-11 7-25-1-25-14V143Z" fill="#fffaf0"/>
-  <path d="m198 224 39 39 81-89" fill="none" stroke="#ffe64d" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="t"><title id="t">자격증봄</title>
+<rect x="3" y="3" width="58" height="58" rx="16" fill="#e8eafc" stroke="#bcc3f0" stroke-width="2"/>
+<rect x="18" y="15" width="28" height="34" rx="4" fill="#fffaf3" stroke="#1d3047" stroke-width="3.5"/>
+<path d="M24 24h11M24 30h9" stroke="#1d3047" stroke-width="2.6" stroke-linecap="round" opacity=".4"/>
+<path d="M23 39.5l4.5 4.5 9.5-11" fill="none" stroke="#3d50c8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="50" cy="14" r="3" fill="#3d50c8"/></svg>
