@@ -5,9 +5,9 @@ import { parseExamDeepLink } from "./deep-link";
 import { FALLBACK_REMINDER_DELAY_MS, createReminderPlan } from "./reminder";
 
 describe("오프라인 카탈로그", () => {
-  it("97개 시험과 공식 HTTPS 출처를 번들한다", () => {
-    expect(catalogStats.examCount).toBe(97);
-    expect(exams).toHaveLength(97);
+  it("104개 시험과 공식 HTTPS 출처를 번들한다", () => {
+    expect(catalogStats.examCount).toBe(104);
+    expect(exams).toHaveLength(104);
     expect(exams.every((exam) => exam.officialUrl.startsWith("https://"))).toBe(true);
   });
 });

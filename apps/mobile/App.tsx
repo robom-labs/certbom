@@ -1,4 +1,4 @@
-// 97개 오프라인 시험 탐색과 관심 시험 알림·공식 링크 흐름을 제공한다.
+// 오프라인 시험 탐색과 관심 시험 알림·공식 링크 흐름을 제공한다(시험 수는 카탈로그에서 동적 계산).
 import { catalogStats, exams, getExam, getNextEvent, type Exam } from "@certbom/core";
 import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
@@ -177,7 +177,7 @@ function MobileApp() {
       <View style={styles.hero}>
         <Text style={styles.eyebrow}>ROBOM FAMILY</Text>
         <Text style={styles.wordmark}>자격증봄</Text>
-        <Text style={styles.subtitle}>97개 시험을 오프라인에서 찾고, 한 건만 골라 알림을 받으세요.</Text>
+        <Text style={styles.subtitle}>{catalogStats.examCount}개 시험을 오프라인에서 찾고, 한 건만 골라 알림을 받으세요.</Text>
       </View>
 
       <View style={styles.selectedCard}>
