@@ -5,12 +5,10 @@ import { getAnalyticsAdapterKind, getAnalyticsConsent, isAnalyticsEnabled, setAn
 import { guestFirstAuthAdapter } from "../auth";
 import { AppHeader } from "../components/AppHeader";
 import { FamilyIcon } from "../components/FamilyIcon";
+import { FONT_SCALE_KEY, applyFontScale, fontScales, readFontScale } from "../font-scale";
 import appMeta from "../generated/robom-family/app-meta.json";
 import type { PwaInstallController, PwaInstallOutcome } from "../pwa-install";
-import { readStoredValue, writeStoredValue } from "../storage";
-
-const FONT_SCALE_KEY = "certbom-font-scale";
-const fontScales = ["100", "115", "130"] as const;
+import { writeStoredValue } from "../storage";
 
 type Props = {
   favoriteCount: number;
@@ -19,11 +17,6 @@ type Props = {
   onApplyUpdate?: () => void;
   onClear: () => void;
 };
-
-function readFontScale(): (typeof fontScales)[number] {
-  const stored = readStoredValue(FONT_SCALE_KEY);
-  return fontScales.find((value) => value === stored) ?? "100";
-}
 
 function installOutcomeMessage(outcome: PwaInstallOutcome): string {
   if (outcome === "accepted" || outcome === "installed") return "자격증봄이 이 기기에 설치됐어요.";
@@ -43,7 +36,7 @@ export function SettingsScreen({ favoriteCount, install, updateReady, onApplyUpd
   const analyticsEnabled = isAnalyticsEnabled();
 
   useEffect(() => {
-    document.documentElement.style.setProperty("--font-scale", `${Number(scale) / 100}`);
+    applyFontScale(scale);
     if (!writeStoredValue(FONT_SCALE_KEY, scale)) {
       setStorageMessage("브라우저가 저장을 막아 글자 크기는 이번 사용 중에만 유지돼요.");
     }
