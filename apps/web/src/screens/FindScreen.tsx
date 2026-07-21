@@ -93,6 +93,13 @@ export function FindScreen({ favorites, startRecommend = false, initialQuery = "
     onStateChange?.(query, value);
   };
 
+  const resetSearch = () => {
+    setQuery("");
+    setFilterId("all");
+    setVisibleCount(PAGE_SIZE);
+    onStateChange?.("", "all");
+  };
+
   return (
     <main className="screen find-screen">
       <AppHeader compact />
@@ -119,7 +126,13 @@ export function FindScreen({ favorites, startRecommend = false, initialQuery = "
           </fieldset>
           <p className="result-count" aria-live="polite">조건에 맞는 시험 {filtered.length}개 · 접수 중과 가까운 일정 순</p>
           {visible.map((exam) => <ExamCard key={exam.id} exam={exam} favorite={favorites.includes(exam.id)} onOpen={onOpen} onToggleFavorite={onToggleFavorite} />)}
-          {filtered.length === 0 && <section className="inline-empty search-empty"><strong>검색 결과가 없어요.</strong><p>약칭이나 기관명으로 다시 검색해 보세요.</p></section>}
+          {filtered.length === 0 && (
+            <section className="inline-empty search-empty">
+              <strong>검색 결과가 없어요.</strong>
+              <p>약칭이나 기관명으로 다시 검색하거나, 검색어와 필터를 지워 전체 시험을 볼 수 있어요.</p>
+              <button className="ghost-button" type="button" onClick={resetSearch}>검색어·필터 지우기</button>
+            </section>
+          )}
           {visible.length < filtered.length && <button className="load-more-button" type="button" onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}>시험 {Math.min(PAGE_SIZE, filtered.length - visible.length)}개 더 보기</button>}
         </>
       ) : (

@@ -142,6 +142,7 @@ a { color: inherit; }
 .result-count { margin: 10px 2px; color: var(--muted); font-size: .82rem; }
 .load-more-button { width: 100%; min-height: 54px; margin: 5px 0 16px; border: 1px solid #cbd4f4; border-radius: 16px; color: var(--blue-deep); background: var(--blue-soft); font-weight: 850; }
 .search-empty { margin-bottom: 18px; }
+.search-empty .ghost-button { margin-top: 12px; }
 
 .recommendation > h2 { margin: 0 0 20px; font-size: 1.65rem; letter-spacing: -.045em; }
 .question { margin: 0 0 14px; padding: 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
