@@ -18,8 +18,8 @@ import {
 } from "./index";
 
 describe("시험 카탈로그", () => {
-  it("공식 출처 8곳의 시험 97개를 제공한다", () => {
-    expect(exams).toHaveLength(97);
+  it("공식 출처 8곳의 시험 104개를 제공한다", () => {
+    expect(exams).toHaveLength(104);
     expect(catalogStats.sourceCount).toBe(8);
     expect(catalogStats.scheduledExamCount).toBeGreaterThanOrEqual(70);
   });
@@ -73,7 +73,7 @@ describe("시험 카탈로그", () => {
     const open = getHomeSummaryExams("open", now);
     const upcoming = getHomeSummaryExams("upcoming", now);
 
-    expect(all).toHaveLength(97);
+    expect(all).toHaveLength(104);
     expect(open.length).toBeGreaterThan(0);
     expect(open.every((exam) => isApplicationOpen(exam, now))).toBe(true);
     expect(upcoming.length).toBeGreaterThan(0);
@@ -171,9 +171,9 @@ describe("추천", () => {
     expect(result[0]?.exam.eligibilityRestricted).toBe(false);
   });
 
-  it("97개 결과에서 상위 3개와 추가 7개를 안정적으로 제공한다", () => {
+  it("104개 결과에서 상위 3개와 추가 7개를 안정적으로 제공한다", () => {
     const result = recommend({ goal: "공무원", interest: "전체", duration: "long", practicalPossible: false, eligibilityRestrictedAllowed: true });
-    expect(result).toHaveLength(97);
+    expect(result).toHaveLength(104);
     expect(result.slice(0, 3)).toHaveLength(3);
     expect(result.slice(3, 10)).toHaveLength(7);
     expect(result.every((item) => item.ruleVersion && item.cautions.length > 0)).toBe(true);
