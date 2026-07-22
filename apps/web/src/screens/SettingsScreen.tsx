@@ -143,7 +143,7 @@ export function SettingsScreen({ favoriteCount, install, updateReady, onApplyUpd
 
       <section className="settings-card" aria-labelledby="settings-family">
         <h3 id="settings-family"><FamilyIcon name="family" /> 로봄 패밀리 앱</h3>
-        <p>다섯 앱을 각 앱의 독립 웹 주소에서 사용할 수 있어요.</p>
+        <p>세 앱을 각 앱의 독립 웹 주소에서 사용할 수 있어요.</p>
         <ul className="family-app-list">
           {appMeta.familyApps.filter((app) => app.id !== "certbom").map((app) => (
             <li key={app.id} data-family-app={app.id}>
