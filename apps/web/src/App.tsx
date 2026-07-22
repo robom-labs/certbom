@@ -115,7 +115,9 @@ export function App() {
     migrateFromKey: "certbom-preparation-v1",
     migrate: migratePreparationIds,
   });
-  const pwaInstall = usePwaInstall();
+  // 스토어 출시 전이라 설치 CTA는 노출하지 않지만, beforeinstallprompt를 가로채는
+  // PWA·TWA 플러밍은 그대로 유지한다(브라우저 기본 설치 배너 억제).
+  usePwaInstall();
   const activeTab = route.kind === "tab" ? route.tab : route.from;
 
   useEffect(() => {
@@ -225,7 +227,7 @@ export function App() {
     if (route.tab === "find") return <FindScreen favorites={favorites.ids} startRecommend={route.recommend} initialQuery={route.findQuery} initialFilter={route.findFilter} onStateChange={syncFindState} onOpen={openExam} onToggleFavorite={toggleFavorite} />;
     if (route.tab === "calendar") return <CalendarScreen favoriteIds={favorites.ids} state={route.calendar ?? calendarState()} onStateChange={syncCalendarState} onFind={() => navigateTab("find")} onOpen={openExam} />;
     if (route.tab === "schedule") return <ScheduleScreen favoriteIds={favorites.ids} onFind={() => navigateTab("find")} onOpen={openExam} />;
-    if (route.tab === "settings") return <SettingsScreen favoriteCount={favorites.ids.length} install={pwaInstall} updateReady={Boolean(applyUpdate)} onApplyUpdate={applyUpdate ?? undefined} onClear={() => { favorites.clear(); checked.clear(); }} />;
+    if (route.tab === "settings") return <SettingsScreen favoriteCount={favorites.ids.length} updateReady={Boolean(applyUpdate)} onApplyUpdate={applyUpdate ?? undefined} onClear={() => { favorites.clear(); checked.clear(); }} />;
     return <HomeScreen selectedFilter={route.homeFilter ?? "open"} favorites={favorites.ids} onFilterChange={(filter) => navigateTab("home", false, filter)} onFind={() => navigateTab("find")} onRecommend={() => navigateTab("find", true)} onOpen={openExam} onToggleFavorite={toggleFavorite} />;
   };
 

@@ -191,8 +191,9 @@ test("설정에서 세 패밀리 앱과 게스트·지원·개인정보·현재 
   await expect(page.getByText(/카카오 로그인은 아직 연결되지 않았어요/)).toBeVisible();
 });
 
-test("beforeinstallprompt를 사용자 설치 CTA에서만 실행한다", async ({ page }) => {
+test("스토어 출시 전이라 설치 유도 CTA는 노출하지 않는다", async ({ page }) => {
   await page.goto("/");
+  // beforeinstallprompt는 계속 가로채지만(플러밍 유지) 사용자에게 설치 버튼을 띄우지 않는다.
   await page.evaluate(() => {
     const event = new Event("beforeinstallprompt", { cancelable: true });
     Object.assign(event, {
@@ -202,8 +203,8 @@ test("beforeinstallprompt를 사용자 설치 CTA에서만 실행한다", async 
     window.dispatchEvent(event);
   });
   await page.getByRole("button", { name: "설정" }).click();
-  await page.getByRole("button", { name: "이 기기에 자격증봄 설치" }).click();
-  await expect(page.getByText("이 기기에 자격증봄이 설치되어 있어요.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "이 기기에 자격증봄 설치" })).toHaveCount(0);
+  await expect(page.getByText("최신 앱 셸 사용 중")).toBeVisible();
 });
 
 test("홈과 설정 패밀리 셸에서 브라우저 오류가 없다", async ({ page }) => {

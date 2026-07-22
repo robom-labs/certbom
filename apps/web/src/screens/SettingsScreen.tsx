@@ -6,7 +6,6 @@ import { guestFirstAuthAdapter } from "../auth";
 import { AppHeader } from "../components/AppHeader";
 import { FamilyIcon } from "../components/FamilyIcon";
 import appMeta from "../generated/robom-family/app-meta.json";
-import type { PwaInstallController, PwaInstallOutcome } from "../pwa-install";
 import { readStoredValue, writeStoredValue } from "../storage";
 
 const FONT_SCALE_KEY = "certbom-font-scale";
@@ -14,7 +13,6 @@ const fontScales = ["100", "115", "130"] as const;
 
 type Props = {
   favoriteCount: number;
-  install: PwaInstallController;
   updateReady: boolean;
   onApplyUpdate?: () => void;
   onClear: () => void;
@@ -25,20 +23,12 @@ function readFontScale(): (typeof fontScales)[number] {
   return fontScales.find((value) => value === stored) ?? "100";
 }
 
-function installOutcomeMessage(outcome: PwaInstallOutcome): string {
-  if (outcome === "accepted" || outcome === "installed") return "자격증봄이 이 기기에 설치됐어요.";
-  if (outcome === "dismissed") return "설치를 취소했어요. 원할 때 다시 시도할 수 있어요.";
-  if (outcome === "failed") return "설치 창을 열지 못했어요. 브라우저 메뉴에서 앱 설치를 선택해 주세요.";
-  return "현재 브라우저에서는 메뉴의 앱 설치 또는 홈 화면 추가를 이용해 주세요.";
-}
-
-export function SettingsScreen({ favoriteCount, install, updateReady, onApplyUpdate, onClear }: Props) {
+export function SettingsScreen({ favoriteCount, updateReady, onApplyUpdate, onClear }: Props) {
   const [scale, setScale] = useState(readFontScale);
   const [online, setOnline] = useState(navigator.onLine);
   const [analyticsConsent, setAnalyticsConsentState] = useState(getAnalyticsConsent);
   const [storageMessage, setStorageMessage] = useState("");
   const [authMessage, setAuthMessage] = useState("공급자 계정과 연결되지 않은 게스트 상태예요.");
-  const [installMessage, setInstallMessage] = useState("");
   const authState = guestFirstAuthAdapter.getState();
   const analyticsEnabled = isAnalyticsEnabled();
 
@@ -64,11 +54,6 @@ export function SettingsScreen({ favoriteCount, install, updateReady, onApplyUpd
     setAnalyticsConsentState(consented);
     const persisted = setAnalyticsConsent(consented);
     setStorageMessage(persisted ? "분석 동의 선택을 이 기기에 저장했어요." : "브라우저가 저장을 막아 분석 동의 선택은 이번 사용 중에만 유지돼요.");
-  };
-
-  const requestInstall = async () => {
-    const outcome = await install.requestInstall();
-    setInstallMessage(installOutcomeMessage(outcome));
   };
 
   return (
@@ -114,19 +99,13 @@ export function SettingsScreen({ favoriteCount, install, updateReady, onApplyUpd
         </div>
       </section>
 
-      <section className="settings-card" aria-labelledby="settings-install">
-        <h3 id="settings-install"><FamilyIcon name="install" /> 설치와 업데이트</h3>
-        {install.availability === "installed" && <p>이 기기에 자격증봄이 설치되어 있어요.</p>}
-        {install.availability === "prompt" && <p>브라우저 설치 창을 열어 앱처럼 빠르게 사용할 수 있어요.</p>}
-        {install.availability === "ios-fallback" && <p>iPhone·iPad에서는 Safari의 공유 버튼을 누른 뒤 ‘홈 화면에 추가’를 선택해 주세요.</p>}
-        {install.availability === "browser-help" && <p>브라우저 메뉴에서 ‘앱 설치’ 또는 ‘홈 화면에 추가’를 선택해 주세요.</p>}
-        {install.availability === "prompt" && <button className="primary-button" type="button" onClick={requestInstall}>이 기기에 자격증봄 설치</button>}
-        <a href={appMeta.stableInstallUrl} target="_blank" rel="noreferrer">안정 설치 안내 열기 <span>↗</span></a>
+      <section className="settings-card" aria-labelledby="settings-update">
+        <h3 id="settings-update"><FamilyIcon name="install" /> 업데이트</h3>
+        <p>자격증봄은 접속할 때마다 최신 앱 셸로 유지돼요. 저장한 관심 시험과 준비물 체크는 그대로 남아요.</p>
         <div className="update-row">
           <span><strong>{updateReady ? "새 버전 준비됨" : "최신 앱 셸 사용 중"}</strong><small>저장한 관심 시험과 준비물 체크는 유지돼요.</small></span>
           {updateReady && onApplyUpdate && <button type="button" onClick={onApplyUpdate}>업데이트</button>}
         </div>
-        {installMessage && <small className="settings-feedback" aria-live="polite">{installMessage}</small>}
       </section>
 
       <section className="settings-card" aria-labelledby="settings-data">
@@ -143,12 +122,12 @@ export function SettingsScreen({ favoriteCount, install, updateReady, onApplyUpd
 
       <section className="settings-card" aria-labelledby="settings-family">
         <h3 id="settings-family"><FamilyIcon name="family" /> 로봄 패밀리 앱</h3>
-        <p>세 앱을 각 앱의 독립 웹 주소에서 사용할 수 있어요.</p>
+        <p>세 앱 모두 준비 중이며 2026년 8월 초 출시 예정이에요.</p>
         <ul className="family-app-list">
           {appMeta.familyApps.filter((app) => app.id !== "certbom").map((app) => (
             <li key={app.id} data-family-app={app.id}>
-              <a href={app.webUrl} target="_blank" rel="noreferrer">
-                <span><strong>{app.name}</strong><small>{app.id === appMeta.id ? "현재 앱" : "웹 앱 열기"}</small></span>
+              <a href={app.installUrl} target="_blank" rel="noreferrer">
+                <span><strong>{app.name}</strong><small>준비 중 · 2026년 8월 초 출시 예정</small></span>
                 <span aria-hidden="true">↗</span>
               </a>
             </li>
