@@ -64,6 +64,11 @@
         }
       ]
     ],
-    "owner": "robom-labs"
+    "owner": "robom-labs",
+    "extra": {
+      "eas": {
+        "projectId": "a9e8c88b-638b-4bf6-881b-539a12915421"
+      }
+    }
   }
 }
