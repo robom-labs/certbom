@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Read-only official-source content monitor for ROBOM HQ.
+// Read-only official-source content monitor for 로봄(ROBOM).
 //
 // Purpose: machine-verify when official exam sources change by recording the
 // HTTP status and a SHA-256 of each official page/PDF body. This is a monitor:
