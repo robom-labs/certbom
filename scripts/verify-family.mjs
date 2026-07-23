@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
-const EXPECTED_SOURCE_COMMIT = "75d4f9d4c803e1dbaa6dda67e48b6ed23960520f";
+const EXPECTED_SOURCE_COMMIT = "ac909be7283ca39fe48ea8579537e29fe3f81a59";
 const REQUIRED_RUNTIME_CONTRACTS = ["feature-flags.json", "auth-config.json"];
 const [generatedDir, lockFile] = process.argv.slice(2);
 
