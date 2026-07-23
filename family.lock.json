@@ -1,15 +1,15 @@
 {
   "familySpecVersion": "1.1.0",
-  "sourceCommit": "75d4f9d4c803e1dbaa6dda67e48b6ed23960520f",
+  "sourceCommit": "ac909be7283ca39fe48ea8579537e29fe3f81a59",
   "generatedAt": "2026-07-21T00:00:00+09:00",
   "files": {
     "tokens.css": "sha256:b54551e239c6fd63b418b453de439ef52524b184b5598a3f765d6a72ceb47e39",
-    "app-meta.json": "sha256:de5782fcb6f1bbf00e9f76eae9069eb60b35e7f8822917f3035c7b5c10429f2b",
+    "app-meta.json": "sha256:d2720bb11f1a5669b80161402f6bce35b96fccd0b6a78c54f70c6d5027f384f1",
     "wordmark.svg": "sha256:a773f1c665a6870a67b5a03455cd20859fbeff91bae6f55467477b0261cacff4",
     "icons.svg": "sha256:dc9a38ef57a68e1e689b38be8630191d706dcc95ba9e50a28bfd2f78a6beae7e",
     "settings-contract.json": "sha256:293bf6cab65f23c15afe5caa0acf1cf5781dc8438a19e325e88b4945796276f4",
     "feature-flags.json": "sha256:fc081098c5f52f8ee62c0732b212fcab143108eb8afda9cad3b656e8586c8351",
-    "auth-config.json": "sha256:650c83f524658fa9a9ff356338c9ae9ac8b5bfc8f52ec7a9a3d95b5afae6a61b",
+    "auth-config.json": "sha256:12ca4383e2a134a85e0abf3c71d594290d7702c991c76651424ba539f3d64674",
     "analytics-events.ts": "sha256:41b69dfeeb520a261dcaf9de8ffc70a2a4c4cbfd6dbdd726d5311fdb5bfe7f6f"
   }
 }

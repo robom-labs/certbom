@@ -23,17 +23,17 @@ export function configureNotificationPresentation() {
     handleNotification: async () => ({
       shouldShowBanner: true,
       shouldShowList: true,
-      shouldPlaySound: false,
+      shouldPlaySound: true,
       shouldSetBadge: false,
     }),
   });
 }
 
-export async function cancelCertbomReminders() {
+export async function cancelCertbomRemindersForExam(examId: string) {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   const certbom = scheduled.filter((notification) => {
     const dedupeKey = notification.content.data?.dedupeKey;
-    return typeof dedupeKey === "string" && dedupeKey.startsWith("certbom:");
+    return typeof dedupeKey === "string" && dedupeKey.startsWith(`certbom:${examId}:`);
   });
   await Promise.all(certbom.map((notification) => Notifications.cancelScheduledNotificationAsync(notification.identifier)));
   return certbom.length;
@@ -54,7 +54,9 @@ export async function scheduleExamReminder(exam: Exam): Promise<ReminderSchedule
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync(REMINDER_CHANNEL_ID, {
         name: "관심 시험 알림",
-        importance: Notifications.AndroidImportance.DEFAULT,
+        description: "사용자가 직접 저장한 시험의 다음 공식 일정을 알려줍니다.",
+        importance: Notifications.AndroidImportance.HIGH,
+        sound: "default",
         vibrationPattern: [0, 250, 250, 250],
       });
     }
@@ -73,7 +75,7 @@ export async function scheduleExamReminder(exam: Exam): Promise<ReminderSchedule
       };
     }
 
-    await cancelCertbomReminders();
+    await cancelCertbomRemindersForExam(exam.id);
     const trigger: Notifications.DateTriggerInput = {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
       date: plan.date,
@@ -82,9 +84,7 @@ export async function scheduleExamReminder(exam: Exam): Promise<ReminderSchedule
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: {
         title: `${exam.name} 확인할 시간이에요`,
-        body: plan.isFallback
-          ? `${plan.eventTitle}이 가까워졌어요. 공식 공고의 시각을 다시 확인해 주세요.`
-          : plan.timePrecision === "date-only"
+        body: plan.timePrecision === "date-only"
             ? `${plan.eventTitle} 전날입니다. 정확한 입실 시각은 공식 공고를 확인해 주세요.`
             : `${plan.eventTitle} 하루 전입니다. 공식 공고를 확인해 주세요.`,
         data: {
@@ -92,7 +92,7 @@ export async function scheduleExamReminder(exam: Exam): Promise<ReminderSchedule
           officialUrl: exam.officialUrl,
           dedupeKey: `certbom:${exam.id}:${nextEvent?.id ?? "official"}`,
         },
-        sound: false,
+        sound: "default",
       },
       trigger,
     });

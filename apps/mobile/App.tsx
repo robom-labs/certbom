@@ -16,8 +16,8 @@ import {
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { parseExamDeepLink } from "./src/deep-link";
-import { scheduleExamReminder } from "./src/notifications";
-import { loadSelectedExamId, saveSelectedExamId } from "./src/storage";
+import { configureNotificationPresentation, scheduleExamReminder } from "./src/notifications";
+import { loadFavoriteExamIds, loadSelectedExamId, saveFavoriteExamIds, saveSelectedExamId } from "./src/storage";
 
 const SUPPORT_URL = process.env.EXPO_PUBLIC_SUPPORT_URL ?? "https://robom.kr/support";
 const PRIVACY_URL = process.env.EXPO_PUBLIC_PRIVACY_URL ?? "https://robom.kr/privacy/certbom";
@@ -46,6 +46,7 @@ function formatReminderDate(value: Date) {
 function MobileApp() {
   const [query, setQuery] = useState("");
   const [selectedExam, setSelectedExam] = useState<Exam>();
+  const [favoriteExamIds, setFavoriteExamIds] = useState<string[]>([]);
   const [notice, setNotice] = useState("관심 시험을 한 건 고르면 기기에 저장할 수 있어요.");
   const [isScheduling, setIsScheduling] = useState(false);
   const selectionMade = useRef(false);
@@ -82,6 +83,7 @@ function MobileApp() {
   );
 
   useEffect(() => {
+    configureNotificationPresentation();
     let mounted = true;
     void loadSelectedExamId().then((examId) => {
       if (!mounted || selectionMade.current || !examId) return;
@@ -91,10 +93,28 @@ function MobileApp() {
         setNotice(`${exam.name}을 기기에서 불러왔습니다.`);
       }
     });
+    void loadFavoriteExamIds().then((examIds) => {
+      if (!mounted) return;
+      setFavoriteExamIds(examIds.filter((examId) => Boolean(getExam(examId))));
+    });
 
     return () => {
       mounted = false;
     };
+  }, []);
+
+  const toggleFavorite = useCallback((exam: Exam) => {
+    setFavoriteExamIds((current) => {
+      const next = current.includes(exam.id)
+        ? current.filter((examId) => examId !== exam.id)
+        : [...current, exam.id];
+      void saveFavoriteExamIds(next).then((saved) => {
+        setNotice(saved
+          ? current.includes(exam.id) ? `${exam.name} 관심 시험을 해제했어요.` : `${exam.name}을 관심 시험에 저장했어요.`
+          : "관심 시험은 현재 화면에 유지되지만 기기 저장에는 실패했습니다.");
+      });
+      return next;
+    });
   }, []);
 
   useEffect(() => {
@@ -145,6 +165,7 @@ function MobileApp() {
   }, [query]);
 
   const nextEvent = selectedExam ? getNextEvent(selectedExam) : undefined;
+  const selectedIsFavorite = selectedExam ? favoriteExamIds.includes(selectedExam.id) : false;
 
   const openExternalUrl = useCallback(async (url: string, label: string) => {
     try {
@@ -177,7 +198,7 @@ function MobileApp() {
       <View style={styles.hero}>
         <Text style={styles.eyebrow}>ROBOM FAMILY</Text>
         <Text style={styles.wordmark}>자격증봄</Text>
-        <Text style={styles.subtitle}>{catalogStats.examCount}개 시험을 오프라인에서 찾고, 한 건만 골라 알림을 받으세요.</Text>
+        <Text style={styles.subtitle}>{catalogStats.examCount}개 시험을 오프라인에서 찾고, 관심 시험별로 알림을 받을 수 있어요.</Text>
       </View>
 
       <View style={styles.selectedCard}>
@@ -193,7 +214,23 @@ function MobileApp() {
                 ? `${nextEvent.title} · ${formatEventDate(nextEvent.startAt)}`
                 : "확정 일정은 공식 시험 페이지에서 확인해 주세요."}
             </Text>
+            <Text style={styles.detailHint}>준비물 {selectedExam.preparation.length}개 · 관심 시험 {favoriteExamIds.length}개</Text>
+            {selectedExam.preparation.length > 0 ? (
+              <Text style={styles.preparationHint}>
+                준비물 {selectedExam.preparation.slice(0, 3).join(' · ')}
+              </Text>
+            ) : null}
             <View style={styles.actionGroup}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: selectedIsFavorite }}
+                onPress={() => toggleFavorite(selectedExam)}
+                style={({ pressed }) => [styles.favoriteButton, selectedIsFavorite && styles.favoriteButtonActive, pressed && styles.pressed]}
+              >
+                <Text style={[styles.favoriteButtonText, selectedIsFavorite && styles.favoriteButtonTextActive]}>
+                  {selectedIsFavorite ? "관심 시험에서 빼기" : "관심 시험에 저장"}
+                </Text>
+              </Pressable>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`${selectedExam.name} 로컬 알림 예약`}
@@ -272,7 +309,7 @@ function MobileApp() {
         ListFooterComponent={
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              일정과 응시자격은 시행기관의 최신 공고를 기준으로 확인하세요.
+              자격증봄은 정부·시행기관을 대표하지 않는 독립 정보 도구입니다. 일정과 응시자격은 시행기관의 최신 공고를 기준으로 확인하세요.
             </Text>
             <View style={styles.footerLinks}>
               <Pressable
@@ -398,9 +435,42 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
+  detailHint: {
+    marginTop: 8,
+    color: "#365b45",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  preparationHint: {
+    marginTop: 6,
+    color: "#526259",
+    fontSize: 13,
+    lineHeight: 19,
+  },
   actionGroup: {
     marginTop: 16,
     gap: 9,
+  },
+  favoriteButton: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#18794e",
+    borderRadius: 14,
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 16,
+  },
+  favoriteButtonActive: {
+    backgroundColor: "#e7f4eb",
+  },
+  favoriteButtonText: {
+    color: "#14633f",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  favoriteButtonTextActive: {
+    color: "#0f5132",
   },
   primaryButton: {
     minHeight: 52,

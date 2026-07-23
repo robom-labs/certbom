@@ -2,7 +2,7 @@
 import { catalogStats, exams } from "@certbom/core";
 import { describe, expect, it } from "vitest";
 import { parseExamDeepLink } from "./deep-link";
-import { FALLBACK_REMINDER_DELAY_MS, createReminderPlan } from "./reminder";
+import { createReminderPlan } from "./reminder";
 
 describe("오프라인 카탈로그", () => {
   it("104개 시험과 공식 HTTPS 출처를 번들한다", () => {
@@ -29,7 +29,6 @@ describe("로컬 알림 시각", () => {
     );
 
     expect(plan?.date.toISOString()).toBe("2026-08-09T01:00:00.000Z");
-    expect(plan?.isFallback).toBe(false);
   });
 
   it("날짜 전용 일정은 전날 KST 오전 9시에 안내한다", () => {
@@ -40,7 +39,6 @@ describe("로컬 알림 시각", () => {
     );
 
     expect(plan?.date.toISOString()).toBe("2026-08-09T00:00:00.000Z");
-    expect(plan?.isFallback).toBe(false);
   });
 
   it("일정이 없거나 이미 지난 일정에는 임의 알림을 만들지 않는다", () => {
@@ -52,13 +50,12 @@ describe("로컬 알림 시각", () => {
     )).toBeUndefined();
   });
 
-  it("하루 전 시각이 지난 가까운 일정은 5분 뒤 재확인 안내로 제한한다", () => {
+  it("하루 전 시각이 지난 가까운 일정에는 사용자가 요청하지 않은 임의 알림을 만들지 않는다", () => {
     const now = new Date("2026-08-01T00:00:00+09:00");
     const plan = createReminderPlan(
       { startAt: "2026-08-01T12:00:00+09:00", title: "가까운 시험", timePrecision: "exact" },
       now,
     );
-    expect(plan?.date.getTime()).toBe(now.getTime() + FALLBACK_REMINDER_DELAY_MS);
-    expect(plan?.isFallback).toBe(true);
+    expect(plan).toBeUndefined();
   });
 });

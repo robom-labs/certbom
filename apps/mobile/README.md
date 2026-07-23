@@ -1,7 +1,7 @@
 <!-- CertBom 모바일 앱의 개발, 검증, 서명 없는 제출 준비 절차를 설명한다. -->
 # CertBom Mobile
 
-`apps/mobile`은 WebView가 아닌 Expo SDK 57 React Native 앱입니다. `@certbom/core`의 97개 시험 카탈로그를 JavaScript 번들에 포함하므로 목록과 검색은 네트워크 없이 동작합니다. 공식 페이지 열기만 네트워크와 외부 브라우저가 필요합니다.
+`apps/mobile`은 WebView가 아닌 Expo SDK 57 React Native 앱입니다. `@certbom/core`의 최신 공식 시험 카탈로그를 JavaScript 번들에 포함하므로 목록과 검색은 네트워크 없이 동작합니다. 공식 페이지 열기만 네트워크와 외부 브라우저가 필요합니다.
 
 ## 앱 계약
 

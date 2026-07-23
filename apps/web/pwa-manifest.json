@@ -1,7 +1,7 @@
 {
   "name": "자격증봄 CertBom",
   "short_name": "자격증봄",
-  "description": "97개 시험 찾기부터 공식 접수·시험일·준비물까지 놓치지 않게",
+  "description": "공식 출처 시험 찾기부터 접수·시험일·준비물까지 놓치지 않게",
   "theme_color": "#2457d6",
   "background_color": "#fffaf2",
   "display": "standalone",
