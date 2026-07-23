@@ -1,6 +1,6 @@
 {
   "name": "@certbom/web",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
     "test": "vitest run",
     "build": "tsc --noEmit && vite build && node ../../scripts/verify-family-build.mjs src/generated/robom-family ../../family.lock.json dist/robom-family",
     "preview": "vite preview --host 0.0.0.0",
-    "test:e2e": "playwright test"
+    "test:e2e": "pnpm build && playwright test"
   },
   "dependencies": {
     "@certbom/core": "workspace:*",

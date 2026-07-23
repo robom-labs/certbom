@@ -2,7 +2,7 @@
   "expo": {
     "name": "자격증봄",
     "slug": "certbom",
-    "version": "0.8.0",
+    "version": "0.8.1",
     "description": "다양한 시험을 오프라인에서 찾고 공식 일정·관심 시험·준비 알림을 확인하는 자격증봄",
     "platforms": [
       "ios",
@@ -14,13 +14,13 @@
     "icon": "./assets/icon.png",
     "ios": {
       "bundleIdentifier": "kr.robom.certbom",
-      "buildNumber": "6",
+      "buildNumber": "7",
       "supportsTablet": true,
       "associatedDomains": []
     },
     "android": {
       "package": "kr.robom.certbom",
-      "versionCode": 6,
+      "versionCode": 7,
       "permissions": [
         "android.permission.POST_NOTIFICATIONS"
       ],

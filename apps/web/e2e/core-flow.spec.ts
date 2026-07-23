@@ -184,7 +184,7 @@ test("설정에서 세 패밀리 앱과 게스트·지원·개인정보·현재 
   await expect(page.locator("[data-family-app]")).toHaveCount(3);
   await expect(page.getByRole("link", { name: /문의와 지원/ })).toHaveAttribute("href", "https://robom.kr/support");
   await expect(page.getByRole("link", { name: /자격증봄 개인정보 처리방침/ })).toHaveAttribute("href", "https://robom.kr/privacy/certbom");
-  await expect(page.getByText("0.8.0", { exact: true })).toBeVisible();
+  await expect(page.getByText("0.8.1", { exact: true })).toBeVisible();
   await expect(page.getByRole("checkbox", { name: /익명 사용성 분석 허용/ })).not.toBeChecked();
 
   await page.getByRole("button", { name: /카카오 연결 준비 상태/ }).click();
