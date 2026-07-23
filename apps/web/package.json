@@ -14,7 +14,7 @@
   "dependencies": {
     "@certbom/core": "workspace:*",
     "@supabase/supabase-js": "2.110.6",
-    "react": "19.2.7",
+    "react": "19.2.8",
     "react-dom": "19.2.7",
     "workbox-window": "7.4.1"
   },
