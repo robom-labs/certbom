@@ -81,7 +81,7 @@ async function main() {
     sources: results,
   };
 
-  await writeFile(OUTPUT_PATH, JSON.stringify(output, null, 2) + "\n", "utf8");
+  await writeFile(OUTPUT_PATH, `${JSON.stringify(output, null, 2)}\n`, "utf8");
 
   const ok200 = results.filter((r) => r.httpStatus === 200).length;
   const blocked = results.length - ok200;
