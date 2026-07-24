@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@certbom/core": "workspace:*",
-    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-async-storage/async-storage": "3.1.1",
     "expo": "~57.0.8",
     "expo-build-properties": "~57.0.7",
     "expo-dev-client": "~57.0.9",
