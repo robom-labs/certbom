@@ -90,6 +90,16 @@ describe("시험 카탈로그", () => {
     expect(isExamUpcoming(exam, examDayNoon)).toBe(true);
   });
 
+  it("공식 원서접수 종료 시각은 기관별 원문과 초 단위까지 일치한다", () => {
+    const history = getExam("history-advanced");
+    const sqld = getExam("sqld");
+    const history80 = history?.events.find((event) => event.id === "history-advanced-80-application");
+    const sqld63 = sqld?.events.find((event) => event.id === "sqld-63-application");
+
+    expect(history80?.endAt).toBe("2026-09-22T17:00:00+09:00");
+    expect(sqld63?.endAt).toBe("2026-10-16T17:59:59+09:00");
+  });
+
   it("진행 중인 기간형 시험은 종료 전까지 곧 시험으로 포함한다", () => {
     const exam = getExam("information-engineer");
     if (!exam) throw new Error("정보처리기사 시험을 찾지 못했습니다.");

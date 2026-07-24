@@ -113,7 +113,7 @@ export const catalogSources = {
   },
 } satisfies Record<string, CatalogSource>;
 
-const atKst = (date: string, time = "00:00") => `${date}T${time}:00+09:00`;
+const atKst = (date: string, time = "00:00") => `${date}T${time.length === 5 ? `${time}:00` : time}+09:00`;
 
 const dateEvent = (
   id: string,
@@ -393,12 +393,12 @@ const historyEvents: EventSeed[] = [
   exactEvent("79-ticket", "ticket", "제79회 수험표 출력", "2026-08-04", "10:00"),
   exactEvent("79-exam", "exam", "제79회 시험", "2026-08-09", "10:00", "2026-08-09", "11:50"),
   exactEvent("79-result", "result", "제79회 결과 발표", "2026-08-21", "10:00"),
-  exactEvent("80-application", "application-open", "제80회 정기접수", "2026-09-15", "10:00", "2026-09-22", "18:00"),
+  exactEvent("80-application", "application-open", "제80회 정기접수", "2026-09-15", "10:00", "2026-09-22", "17:00"),
   exactEvent("80-cancel", "application-open", "제80회 취소좌석 접수", "2026-09-29", "10:00", "2026-10-02", "17:00"),
   exactEvent("80-ticket", "ticket", "제80회 수험표 출력", "2026-10-13", "10:00"),
   exactEvent("80-exam", "exam", "제80회 시험", "2026-10-17", "10:00"),
   exactEvent("80-result", "result", "제80회 결과 발표", "2026-10-30", "10:00"),
-  exactEvent("81-application", "application-open", "제81회 정기접수", "2026-11-03", "10:00", "2026-11-10", "18:00"),
+  exactEvent("81-application", "application-open", "제81회 정기접수", "2026-11-03", "10:00", "2026-11-10", "17:00"),
   exactEvent("81-cancel", "application-open", "제81회 취소좌석 접수", "2026-11-11", "13:00", "2026-11-13", "17:00"),
   exactEvent("81-ticket", "ticket", "제81회 수험표 출력", "2026-11-24", "10:00"),
   exactEvent("81-exam", "exam", "제81회 시험", "2026-11-28", "10:00"),
@@ -426,46 +426,46 @@ const historyExam = seed("history-advanced", "한국사능력검정시험", "한
 
 const kdataEvents: Record<string, EventSeed[]> = {
   "bigdata-analyst": [
-    exactEvent("13-written-application", "application-open", "제13회 필기 원서접수", "2026-08-03", "10:00", "2026-08-07", "18:00"),
+    exactEvent("13-written-application", "application-open", "제13회 필기 원서접수", "2026-08-03", "10:00", "2026-08-07", "17:59:59"),
     exactEvent("13-ticket", "ticket", "제13회 필기 수험표 발급", "2026-08-21", "10:00"),
     exactEvent("13-written", "exam", "제13회 필기시험", "2026-09-05", "10:00"),
     exactEvent("13-written-result", "result", "제13회 필기 결과 발표", "2026-09-23", "10:00"),
-    exactEvent("13-practical-application", "application-open", "제13회 실기 원서접수", "2026-10-26", "10:00", "2026-10-30", "18:00"),
+    exactEvent("13-practical-application", "application-open", "제13회 실기 원서접수", "2026-10-26", "10:00", "2026-10-30", "17:59:59"),
     exactEvent("13-practical", "exam", "제13회 실기시험", "2026-11-28", "10:00"),
     exactEvent("13-final-result", "result", "제13회 최종 결과 발표", "2026-12-18", "10:00"),
   ],
   adp: [
-    exactEvent("37-practical-application", "application-open", "제37회 실기 원서접수", "2026-09-14", "10:00", "2026-09-18", "18:00"),
+    exactEvent("37-practical-application", "application-open", "제37회 실기 원서접수", "2026-09-14", "10:00", "2026-09-18", "17:59:59"),
     exactEvent("37-practical", "exam", "제37회 실기시험", "2026-10-17", "10:00"),
     exactEvent("37-result", "result", "제37회 실기 결과 발표", "2026-11-13", "10:00"),
   ],
   adsp: [
     exactEvent("50-exam", "exam", "제50회 시험", "2026-08-08", "10:00"),
     exactEvent("50-result", "result", "제50회 결과 발표", "2026-08-28", "10:00"),
-    exactEvent("51-application", "application-open", "제51회 원서접수", "2026-09-28", "10:00", "2026-10-02", "18:00"),
+    exactEvent("51-application", "application-open", "제51회 원서접수", "2026-09-28", "10:00", "2026-10-02", "17:59:59"),
     exactEvent("51-exam", "exam", "제51회 시험", "2026-10-31", "10:00"),
     exactEvent("51-result", "result", "제51회 결과 발표", "2026-11-20", "10:00"),
   ],
   sqlp: [
-    exactEvent("55-application", "application-open", "제55회 원서접수", "2026-07-20", "10:00", "2026-07-24", "18:00", "kdata-sql-application"),
+    exactEvent("55-application", "application-open", "제55회 원서접수", "2026-07-20", "10:00", "2026-07-24", "17:59:59", "kdata-sql-application"),
     exactEvent("55-exam", "exam", "제55회 시험", "2026-08-22", "10:00", undefined, undefined, "kdata-sql-exam"),
     exactEvent("55-result", "result", "제55회 결과 발표", "2026-09-18", "10:00"),
   ],
   sqld: [
-    exactEvent("62-application", "application-open", "제62회 원서접수", "2026-07-20", "10:00", "2026-07-24", "18:00", "kdata-sql-application"),
+    exactEvent("62-application", "application-open", "제62회 원서접수", "2026-07-20", "10:00", "2026-07-24", "17:59:59", "kdata-sql-application"),
     exactEvent("62-exam", "exam", "제62회 시험", "2026-08-22", "10:00", undefined, undefined, "kdata-sql-exam"),
     exactEvent("62-result", "result", "제62회 결과 발표", "2026-09-11", "10:00"),
-    exactEvent("63-application", "application-open", "제63회 원서접수", "2026-10-12", "10:00", "2026-10-16", "18:00"),
+    exactEvent("63-application", "application-open", "제63회 원서접수", "2026-10-12", "10:00", "2026-10-16", "17:59:59"),
     exactEvent("63-exam", "exam", "제63회 시험", "2026-11-14", "10:00"),
     exactEvent("63-result", "result", "제63회 결과 발표", "2026-12-04", "10:00"),
   ],
   dap: [
-    exactEvent("66-application", "application-open", "제66회 원서접수", "2026-08-14", "10:00", "2026-08-21", "18:00", "kdata-architecture-application"),
+    exactEvent("66-application", "application-open", "제66회 원서접수", "2026-08-14", "10:00", "2026-08-21", "17:59:59", "kdata-architecture-application"),
     exactEvent("66-exam", "exam", "제66회 시험", "2026-09-19", "10:00", undefined, undefined, "kdata-architecture-exam"),
     exactEvent("66-result", "result", "제66회 결과 발표", "2026-10-16", "10:00"),
   ],
   dasp: [
-    exactEvent("61-application", "application-open", "제61회 원서접수", "2026-08-14", "10:00", "2026-08-21", "18:00", "kdata-architecture-application"),
+    exactEvent("61-application", "application-open", "제61회 원서접수", "2026-08-14", "10:00", "2026-08-21", "17:59:59", "kdata-architecture-application"),
     exactEvent("61-exam", "exam", "제61회 시험", "2026-09-19", "10:00", undefined, undefined, "kdata-architecture-exam"),
     exactEvent("61-result", "result", "제61회 결과 발표", "2026-10-08", "10:00"),
   ],
