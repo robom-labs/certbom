@@ -3,8 +3,11 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
 import { App } from "./App";
+import { applyFontScale, readFontScale } from "./font-scale";
 import "./generated/robom-family/tokens.css";
 import "./styles.css";
+
+applyFontScale(readFontScale());
 
 const updateServiceWorker = registerSW({
   onNeedRefresh() {

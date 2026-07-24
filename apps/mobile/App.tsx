@@ -6,6 +6,7 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Keyboard,
   Pressable,
@@ -16,7 +17,12 @@ import {
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { parseExamDeepLink } from "./src/deep-link";
-import { configureNotificationPresentation, scheduleExamReminder } from "./src/notifications";
+import {
+  cancelCertbomRemindersForExam,
+  configureNotificationPresentation,
+  reconcileCertbomReminders,
+  scheduleExamReminder,
+} from "./src/notifications";
 import { loadFavoriteExamIds, loadSelectedExamId, saveFavoriteExamIds, saveSelectedExamId } from "./src/storage";
 
 const SUPPORT_URL = process.env.EXPO_PUBLIC_SUPPORT_URL ?? "https://robom.kr/support";
@@ -49,6 +55,8 @@ function MobileApp() {
   const [favoriteExamIds, setFavoriteExamIds] = useState<string[]>([]);
   const [notice, setNotice] = useState("관심 시험을 한 건 고르면 기기에 저장할 수 있어요.");
   const [isScheduling, setIsScheduling] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [scheduledReminderIds, setScheduledReminderIds] = useState<Record<string, string>>({});
   const selectionMade = useRef(false);
 
   const selectExam = useCallback((exam: Exam, message: string) => {
@@ -97,25 +105,60 @@ function MobileApp() {
       if (!mounted) return;
       setFavoriteExamIds(examIds.filter((examId) => Boolean(getExam(examId))));
     });
+    void reconcileCertbomReminders(exams)
+      .then((reminders) => {
+        if (!mounted) return;
+        setScheduledReminderIds(Object.fromEntries(reminders.map((reminder) => [reminder.examId, reminder.notificationId])));
+      })
+      .catch(() => undefined);
 
     return () => {
       mounted = false;
     };
   }, []);
 
-  const toggleFavorite = useCallback((exam: Exam) => {
+  const updateFavorites = useCallback((exam: Exam, removeReminder: boolean) => {
     setFavoriteExamIds((current) => {
-      const next = current.includes(exam.id)
+      const isFavorite = current.includes(exam.id);
+      const next = isFavorite
         ? current.filter((examId) => examId !== exam.id)
         : [...current, exam.id];
-      void saveFavoriteExamIds(next).then((saved) => {
-        setNotice(saved
-          ? current.includes(exam.id) ? `${exam.name} 관심 시험을 해제했어요.` : `${exam.name}을 관심 시험에 저장했어요.`
-          : "관심 시험은 현재 화면에 유지되지만 기기 저장에는 실패했습니다.");
+      void saveFavoriteExamIds(next).then(async (saved) => {
+        if (!saved) {
+          setNotice("관심 시험은 현재 화면에 유지되지만 기기 저장에는 실패했습니다.");
+          return;
+        }
+        if (isFavorite && removeReminder) {
+          await cancelCertbomRemindersForExam(exam.id);
+          setScheduledReminderIds((scheduled) => {
+            const nextScheduled = { ...scheduled };
+            delete nextScheduled[exam.id];
+            return nextScheduled;
+          });
+          setNotice(`${exam.name} 관심 시험과 예약 알림을 해제했어요.`);
+          return;
+        }
+        setNotice(isFavorite ? `${exam.name} 관심 시험을 해제했어요.` : `${exam.name}을 관심 시험에 저장했어요.`);
       });
       return next;
     });
   }, []);
+
+  const toggleFavorite = useCallback((exam: Exam) => {
+    if (!favoriteExamIds.includes(exam.id)) {
+      updateFavorites(exam, false);
+      return;
+    }
+    Alert.alert(
+      "관심 시험에서 빼기",
+      "이미 예약한 알림도 함께 취소할까요?",
+      [
+        { text: "알림 유지", onPress: () => updateFavorites(exam, false) },
+        { text: "알림도 취소", style: "destructive", onPress: () => updateFavorites(exam, true) },
+        { text: "취소", style: "cancel" },
+      ],
+    );
+  }, [favoriteExamIds, updateFavorites]);
 
   useEffect(() => {
     const handleUrl = ({ url }: { url: string }) => {
@@ -166,6 +209,7 @@ function MobileApp() {
 
   const nextEvent = selectedExam ? getNextEvent(selectedExam) : undefined;
   const selectedIsFavorite = selectedExam ? favoriteExamIds.includes(selectedExam.id) : false;
+  const selectedHasReminder = selectedExam ? Boolean(scheduledReminderIds[selectedExam.id]) : false;
 
   const openExternalUrl = useCallback(async (url: string, label: string) => {
     try {
@@ -191,7 +235,26 @@ function MobileApp() {
     setNotice(
       `${result.plan.eventTitle} 알림을 ${formatReminderDate(result.plan.date)}에 예약했습니다.`,
     );
+    setScheduledReminderIds((current) => ({ ...current, [selectedExam.id]: result.notificationId }));
   }, [isScheduling, selectedExam]);
+
+  const cancelReminder = useCallback(async () => {
+    if (!selectedExam || isCancelling) return;
+    setIsCancelling(true);
+    try {
+      const cancelled = await cancelCertbomRemindersForExam(selectedExam.id);
+      setScheduledReminderIds((current) => {
+        const next = { ...current };
+        delete next[selectedExam.id];
+        return next;
+      });
+      setNotice(cancelled ? `${selectedExam.name} 예약 알림을 취소했어요.` : "취소할 예약 알림이 없어요.");
+    } catch {
+      setNotice("알림 취소 중 오류가 발생했어요. 다시 시도해 주세요.");
+    } finally {
+      setIsCancelling(false);
+    }
+  }, [isCancelling, selectedExam]);
 
   const header = (
     <View>
@@ -215,6 +278,7 @@ function MobileApp() {
                 : "확정 일정은 공식 시험 페이지에서 확인해 주세요."}
             </Text>
             <Text style={styles.detailHint}>준비물 {selectedExam.preparation.length}개 · 관심 시험 {favoriteExamIds.length}개</Text>
+            {selectedHasReminder ? <Text style={styles.reminderStatus}>이 시험의 로컬 알림이 예약되어 있어요.</Text> : null}
             {selectedExam.preparation.length > 0 ? (
               <Text style={styles.preparationHint}>
                 준비물 {selectedExam.preparation.slice(0, 3).join(' · ')}
@@ -234,20 +298,30 @@ function MobileApp() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`${selectedExam.name} 로컬 알림 예약`}
-                disabled={isScheduling}
+                disabled={isScheduling || selectedHasReminder}
                 onPress={scheduleReminder}
                 style={({ pressed }) => [
                   styles.primaryButton,
                   pressed && styles.pressed,
-                  isScheduling && styles.disabled,
+                  (isScheduling || selectedHasReminder) && styles.disabled,
                 ]}
               >
                 {isScheduling ? (
                   <ActivityIndicator color="#ffffff" />
                 ) : (
-                  <Text style={styles.primaryButtonText}>로컬 알림 예약</Text>
+                  <Text style={styles.primaryButtonText}>{selectedHasReminder ? "알림 예약됨" : "로컬 알림 예약"}</Text>
                 )}
               </Pressable>
+              {selectedHasReminder ? (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isCancelling}
+                  onPress={() => void cancelReminder()}
+                  style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed, isCancelling && styles.disabled]}
+                >
+                  <Text style={styles.cancelButtonText}>{isCancelling ? "취소 중" : "예약 알림 취소"}</Text>
+                </Pressable>
+              ) : null}
               <Pressable
                 accessibilityRole="link"
                 onPress={() => void openExternalUrl(selectedExam.officialUrl, "공식 시험 페이지")}
@@ -336,7 +410,7 @@ function MobileApp() {
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ selected: isSelected }}
-              onPress={() => selectExam(item, `${item.name}을 관심 시험으로 저장했습니다.`)}
+              onPress={() => selectExam(item, `${item.name} 시험 상세를 열었어요.`)}
               style={({ pressed }) => [
                 styles.examRow,
                 isSelected && styles.examRowSelected,
@@ -441,6 +515,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
   },
+  reminderStatus: {
+    marginTop: 8,
+    color: "#14633f",
+    fontSize: 13,
+    fontWeight: "700",
+  },
   preparationHint: {
     marginTop: 6,
     color: "#526259",
@@ -483,6 +563,21 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: "#ffffff",
     fontSize: 16,
+    fontWeight: "800",
+  },
+  cancelButton: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#a33d35",
+    borderRadius: 14,
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 16,
+  },
+  cancelButtonText: {
+    color: "#8a3029",
+    fontSize: 15,
     fontWeight: "800",
   },
   secondaryButton: {

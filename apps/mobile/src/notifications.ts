@@ -18,6 +18,12 @@ export type ReminderScheduleResult =
       message: string;
     };
 
+export type ScheduledExamReminder = {
+  examId: string;
+  dedupeKey: string;
+  notificationId: string;
+};
+
 export function configureNotificationPresentation() {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -37,6 +43,18 @@ export async function cancelCertbomRemindersForExam(examId: string) {
   });
   await Promise.all(certbom.map((notification) => Notifications.cancelScheduledNotificationAsync(notification.identifier)));
   return certbom.length;
+}
+
+export async function getScheduledCertbomReminders(): Promise<ScheduledExamReminder[]> {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  return scheduled.flatMap((notification) => {
+    const examId = notification.content.data?.examId;
+    const dedupeKey = notification.content.data?.dedupeKey;
+    if (typeof examId !== "string" || typeof dedupeKey !== "string" || !dedupeKey.startsWith("certbom:")) {
+      return [];
+    }
+    return [{ examId, dedupeKey, notificationId: notification.identifier }];
+  });
 }
 
 export async function scheduleExamReminder(exam: Exam): Promise<ReminderScheduleResult> {
@@ -90,7 +108,7 @@ export async function scheduleExamReminder(exam: Exam): Promise<ReminderSchedule
         data: {
           examId: exam.id,
           officialUrl: exam.officialUrl,
-          dedupeKey: `certbom:${exam.id}:${nextEvent?.id ?? "official"}`,
+          dedupeKey: `certbom:${exam.id}:${nextEvent?.id ?? "official"}:${plan.date.toISOString()}`,
         },
         sound: "default",
       },
@@ -105,4 +123,28 @@ export async function scheduleExamReminder(exam: Exam): Promise<ReminderSchedule
       message: "이 기기에서는 알림을 예약하지 못했습니다. 시험 탐색과 공식 링크는 계속 사용할 수 있어요.",
     };
   }
+}
+
+// 앱 시작 때 과거·삭제된 일정 알림을 치우고 일정 변경된 관심 시험만 다시 예약합니다.
+export async function reconcileCertbomReminders(exams: readonly Exam[]): Promise<ScheduledExamReminder[]> {
+  const scheduled = await getScheduledCertbomReminders();
+  const byId = new Map(exams.map((exam) => [exam.id, exam]));
+  const rearm = new Map<string, Exam>();
+
+  await Promise.all(scheduled.map(async (reminder) => {
+    const exam = byId.get(reminder.examId);
+    const nextEvent = exam ? getNextEvent(exam) : undefined;
+    const plan = createReminderPlan(nextEvent);
+    const expectedKey = plan && exam ? `certbom:${exam.id}:${nextEvent?.id ?? "official"}:${plan.date.toISOString()}` : null;
+    if (!exam || !plan || reminder.dedupeKey !== expectedKey) {
+      await Notifications.cancelScheduledNotificationAsync(reminder.notificationId);
+      if (exam && plan) rearm.set(exam.id, exam);
+    }
+  }));
+
+  for (const exam of rearm.values()) {
+    await scheduleExamReminder(exam);
+  }
+
+  return getScheduledCertbomReminders();
 }
