@@ -18,5 +18,10 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.4"
+  },
+  "pnpm": {
+    "overrides": {
+      "brace-expansion": "^5.0.8"
+    }
   }
 }
