@@ -14,13 +14,13 @@
     "icon": "./assets/icon.png",
     "ios": {
       "bundleIdentifier": "kr.robom.certbom",
-      "buildNumber": "9",
+      "buildNumber": "10",
       "supportsTablet": true,
       "associatedDomains": []
     },
     "android": {
       "package": "kr.robom.certbom",
-      "versionCode": 9,
+      "versionCode": 10,
       "permissions": [
         "android.permission.POST_NOTIFICATIONS"
       ],
