@@ -7,7 +7,9 @@ const appSource = await readFile(new URL("../apps/mobile/App.tsx", import.meta.u
 const notificationSource = await readFile(new URL("../apps/mobile/src/notifications.ts", import.meta.url), "utf8");
 
 test("앱 시작 때 예약을 재조정하고 화면 상태를 복원한다", () => {
-  assert.match(appSource, /reconcileCertbomReminders\(exams\)/);
+  assert.match(appSource, /reconcileCertbomReminders\(exams, intendedIds\)/);
+  assert.match(appSource, /loadReminderExamIds/);
+  assert.match(appSource, /saveReminderExamIds/);
   assert.match(appSource, /setScheduledReminderIds/);
   assert.match(notificationSource, /getAllScheduledNotificationsAsync/);
   assert.match(notificationSource, /cancelScheduledNotificationAsync/);

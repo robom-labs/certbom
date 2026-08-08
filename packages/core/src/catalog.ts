@@ -1,13 +1,19 @@
 // 공식 일정 스냅샷을 앱에서 쓰는 시험 카탈로그와 탐색 도우미로 변환한다.
 import { CATALOG_DATA_VERSION, CATALOG_UPDATED_AT, catalogSources, examSeeds } from "./catalog-data";
 import type { Exam, ExamEvent, HomeSummaryFilter, PreparationItem } from "./model";
-import { CATALOG_REVIEWED_AT, SOURCE_CONNECTION_STATUS, SOURCE_REVIEWED_AT } from "./source-metadata.generated";
+import {
+  CATALOG_REVIEWED_AT,
+  SOURCE_CONNECTION_STATUS,
+  SOURCE_FRESHNESS_STATUS,
+  SOURCE_REVIEWED_AT,
+} from "./source-metadata.generated";
 
 export {
   CATALOG_DATA_VERSION,
   CATALOG_REVIEWED_AT,
   CATALOG_UPDATED_AT,
   SOURCE_CONNECTION_STATUS,
+  SOURCE_FRESHNESS_STATUS,
   SOURCE_REVIEWED_AT,
   catalogSources,
 };

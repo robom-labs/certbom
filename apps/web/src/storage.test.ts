@@ -1,7 +1,12 @@
 // 기기 저장 데이터가 손상돼도 앱이 안전하게 시작되는지 검증한다.
 import { renderHook, act } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readStoredValue, useStoredIds, writeStoredValue } from "./storage";
+import {
+  readStoredValue,
+  replaceStoredIdListsAtomically,
+  useStoredIds,
+  writeStoredValue,
+} from "./storage";
 
 describe("기기 저장", () => {
   afterEach(() => {
@@ -63,6 +68,54 @@ describe("기기 저장", () => {
     expect(result.current.ids).toEqual(["new:old-id"]);
     expect(window.localStorage.getItem("legacy")).toBe(JSON.stringify(["old-id"]));
     expect(window.localStorage.getItem("next")).toBe(JSON.stringify(["new:old-id"]));
+  });
+
+  it("현재 키가 손상됐으면 유효한 기존 키에서 복구한다", () => {
+    window.localStorage.setItem("current", "{");
+    window.localStorage.setItem("legacy", JSON.stringify(["old-id"]));
+    const { result } = renderHook(() => useStoredIds("current", {
+      migrateFromKey: "legacy",
+      migrate: (ids) => ids.map((id) => `new:${id}`),
+    }));
+
+    expect(result.current.ids).toEqual(["new:old-id"]);
+    expect(window.localStorage.getItem("current")).toBe(JSON.stringify(["new:old-id"]));
+  });
+
+  it("현재 키의 유효한 빈 목록은 기존 값을 다시 살리지 않는다", () => {
+    window.localStorage.setItem("current", JSON.stringify([]));
+    window.localStorage.setItem("legacy", JSON.stringify(["old-id"]));
+    const { result } = renderHook(() => useStoredIds("current", {
+      migrateFromKey: "legacy",
+      migrate: (ids) => ids.map((id) => `new:${id}`),
+    }));
+
+    expect(result.current.ids).toEqual([]);
+  });
+
+  it("백업 복원은 두 목록을 모두 쓴 뒤 다시 읽어 검증한다", () => {
+    replaceStoredIdListsAtomically([
+      { key: "favorites", ids: ["exam-1", "exam-1"] },
+      { key: "checked", ids: ["item-1"] },
+    ]);
+
+    expect(JSON.parse(window.localStorage.getItem("favorites") ?? "[]")).toEqual(["exam-1"]);
+    expect(JSON.parse(window.localStorage.getItem("checked") ?? "[]")).toEqual(["item-1"]);
+  });
+
+  it("백업 두 번째 저장이 실패하면 첫 번째 저장도 이전 상태로 되돌린다", () => {
+    window.localStorage.setItem("favorites", JSON.stringify(["before-favorite"]));
+    window.localStorage.setItem("checked", JSON.stringify(["before-check"]));
+    vi.spyOn(window.localStorage, "setItem")
+      .mockImplementationOnce(() => undefined)
+      .mockImplementationOnce(() => { throw new Error("quota exceeded"); });
+
+    expect(() => replaceStoredIdListsAtomically([
+      { key: "favorites", ids: ["after-favorite"] },
+      { key: "checked", ids: ["after-check"] },
+    ])).toThrow(/기기 저장 공간/);
+    expect(window.localStorage.getItem("favorites")).toBe(JSON.stringify(["before-favorite"]));
+    expect(window.localStorage.getItem("checked")).toBe(JSON.stringify(["before-check"]));
   });
 
   it("현재 키에 남은 이전 버전 ID도 새 안정 ID로 다시 정규화한다", () => {

@@ -2,6 +2,7 @@
 import { catalogStats, exams } from "@certbom/core";
 import { describe, expect, it } from "vitest";
 import { parseExamDeepLink } from "./deep-link";
+import { formatPreparationPreview } from "./preparation-preview";
 import { createReminderPlan } from "./reminder";
 
 describe("오프라인 카탈로그", () => {
@@ -9,6 +10,14 @@ describe("오프라인 카탈로그", () => {
     expect(catalogStats.examCount).toBe(104);
     expect(exams).toHaveLength(104);
     expect(exams.every((exam) => exam.officialUrl.startsWith("https://"))).toBe(true);
+  });
+
+  it("준비물 객체를 사람이 읽는 라벨만으로 요약한다", () => {
+    const exam = exams.find((candidate) => candidate.preparation.length >= 3);
+    if (!exam) throw new Error("준비물 테스트 시험이 없습니다.");
+    const preview = formatPreparationPreview(exam.preparation);
+    expect(preview).not.toContain("[object Object]");
+    expect(preview).toBe(exam.preparation.slice(0, 3).map((item) => item.label).join(" · "));
   });
 });
 

@@ -126,23 +126,30 @@ export async function scheduleExamReminder(exam: Exam): Promise<ReminderSchedule
 }
 
 // 앱 시작 때 과거·삭제된 일정 알림을 치우고 일정 변경된 관심 시험만 다시 예약합니다.
-export async function reconcileCertbomReminders(exams: readonly Exam[]): Promise<ScheduledExamReminder[]> {
+export async function reconcileCertbomReminders(
+  exams: readonly Exam[],
+  intendedExamIds?: readonly string[],
+): Promise<ScheduledExamReminder[]> {
   const scheduled = await getScheduledCertbomReminders();
   const byId = new Map(exams.map((exam) => [exam.id, exam]));
-  const rearm = new Map<string, Exam>();
+  const intended = new Set(intendedExamIds ?? scheduled.map((reminder) => reminder.examId));
+  const exact = new Set<string>();
 
   await Promise.all(scheduled.map(async (reminder) => {
     const exam = byId.get(reminder.examId);
     const nextEvent = exam ? getNextEvent(exam) : undefined;
     const plan = createReminderPlan(nextEvent);
     const expectedKey = plan && exam ? `certbom:${exam.id}:${nextEvent?.id ?? "official"}:${plan.date.toISOString()}` : null;
-    if (!exam || !plan || reminder.dedupeKey !== expectedKey) {
+    if (!intended.has(reminder.examId) || !exam || !plan || reminder.dedupeKey !== expectedKey || exact.has(reminder.examId)) {
       await Notifications.cancelScheduledNotificationAsync(reminder.notificationId);
-      if (exam && plan) rearm.set(exam.id, exam);
+      return;
     }
+    exact.add(reminder.examId);
   }));
 
-  for (const exam of rearm.values()) {
+  for (const examId of intended) {
+    const exam = byId.get(examId);
+    if (!exam || exact.has(examId) || !createReminderPlan(getNextEvent(exam))) continue;
     await scheduleExamReminder(exam);
   }
 

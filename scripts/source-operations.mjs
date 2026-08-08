@@ -185,6 +185,7 @@ async function sync() {
       recordCount: 0,
       anomalies: [],
     });
+    if (hasFlag("strict")) process.exitCode = 2;
     return;
   }
 

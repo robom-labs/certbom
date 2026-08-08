@@ -13,7 +13,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: certbom-source-operations
+  group: certbom-source-writers
   cancel-in-progress: false
 
 jobs:
@@ -49,6 +49,7 @@ jobs:
           git config user.email "operations@robom.kr"
           git add ops/source-registry/last-known-good
           git commit -m "data: refresh Q-Net last-known-good [skip ci]"
+          git pull --rebase origin main
           git push origin HEAD:main
       - name: 장애·외부 차단은 중복 없는 이슈 하나로 승격
         if: always()

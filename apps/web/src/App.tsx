@@ -17,7 +17,7 @@ import {
 } from "./screens/CalendarScreen";
 import { ScheduleScreen } from "./screens/ScheduleScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
-import { useStoredIds } from "./storage";
+import { replaceStoredIdListsAtomically, useStoredIds } from "./storage";
 
 type Route =
   | {
@@ -232,9 +232,15 @@ export function App() {
       checkedIds={checked.ids}
       updateReady={Boolean(applyUpdate)}
       onApplyUpdate={applyUpdate ?? undefined}
-      onRestoreData={(backup) => {
-        favorites.replace([...favorites.ids, ...backup.favoriteIds]);
-        checked.replace([...checked.ids, ...backup.checkedIds]);
+      onRestoreData={async (backup) => {
+        const favoriteIds = [...new Set([...favorites.ids, ...backup.favoriteIds])];
+        const checkedIds = [...new Set([...checked.ids, ...backup.checkedIds])];
+        replaceStoredIdListsAtomically([
+          { key: "certbom-favorites-v1", ids: favoriteIds },
+          { key: "certbom-preparation-v2", ids: checkedIds },
+        ]);
+        favorites.replace(favoriteIds);
+        checked.replace(checkedIds);
       }}
       onClear={() => { favorites.clear(); checked.clear(); }}
     />;

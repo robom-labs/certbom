@@ -3,6 +3,7 @@ import {
   CATALOG_DATA_VERSION,
   CATALOG_REVIEWED_AT,
   SOURCE_CONNECTION_STATUS,
+  SOURCE_FRESHNESS_STATUS,
   catalogStats,
 } from "@certbom/core";
 import { useEffect, useRef, useState } from "react";
@@ -21,7 +22,7 @@ type Props = {
   updateReady: boolean;
   onApplyUpdate?: () => void;
   onClear: () => void;
-  onRestoreData: (backup: Pick<DeviceBackup, "favoriteIds" | "checkedIds">) => void;
+  onRestoreData: (backup: Pick<DeviceBackup, "favoriteIds" | "checkedIds">) => Promise<void>;
 };
 
 export function SettingsScreen({ favoriteIds, checkedIds, updateReady, onApplyUpdate, onClear, onRestoreData }: Props) {
@@ -29,6 +30,7 @@ export function SettingsScreen({ favoriteIds, checkedIds, updateReady, onApplyUp
   const [online, setOnline] = useState(navigator.onLine);
   const [analyticsConsent, setAnalyticsConsentState] = useState(getAnalyticsConsent);
   const [storageMessage, setStorageMessage] = useState("");
+  const [clearConfirming, setClearConfirming] = useState(false);
   const backupInput = useRef<HTMLInputElement>(null);
   const analyticsEnabled = isAnalyticsEnabled();
 
@@ -72,7 +74,7 @@ export function SettingsScreen({ favoriteIds, checkedIds, updateReady, onApplyUp
     try {
       if (file.size > MAX_BACKUP_BYTES) throw new Error("백업 파일이 너무 큽니다.");
       const backup = parseDeviceBackup(await file.text());
-      onRestoreData(backup);
+      await onRestoreData(backup);
       setStorageMessage(`백업에서 관심 시험 ${backup.favoriteIds.length}개와 준비 체크 ${backup.checkedIds.length}개를 합쳤어요.`);
     } catch (error) {
       setStorageMessage(error instanceof Error ? error.message : "백업 파일을 불러오지 못했어요.");
@@ -144,11 +146,21 @@ export function SettingsScreen({ favoriteIds, checkedIds, updateReady, onApplyUp
           <div><dt>공식 출처</dt><dd>{catalogStats.sourceCount}개</dd></div>
           <div><dt>일정 검토본</dt><dd>{new Date(CATALOG_REVIEWED_AT).toLocaleDateString("ko-KR")}</dd></div>
           <div><dt>공식 페이지 점검</dt><dd>{SOURCE_CONNECTION_STATUS.healthyCount}/{SOURCE_CONNECTION_STATUS.totalCount}곳 응답 · {new Date(SOURCE_CONNECTION_STATUS.checkedAt).toLocaleDateString("ko-KR")}</dd></div>
+          <div><dt>일정 내용 상태</dt><dd>{SOURCE_FRESHNESS_STATUS.staleCount > 0 ? `검토 주기 경과 ${SOURCE_FRESHNESS_STATUS.staleCount}곳` : "모든 출처 검토 주기 안"}</dd></div>
           <div><dt>네트워크</dt><dd>{online ? "온라인" : "오프라인 · 저장 정보 표시"}</dd></div>
           <div><dt>기기 저장</dt><dd>관심 시험 {favoriteIds.length}개 · 준비 체크 {checkedIds.length}개</dd></div>
         </dl>
         {SOURCE_CONNECTION_STATUS.failedSourceIds.length > 0 && <p className="source-connection-note">자동 점검에서 응답하지 않은 {SOURCE_CONNECTION_STATUS.failedSourceIds.length}곳은 다음 점검 때 다시 시도합니다. 앱은 마지막 공식 검토 스냅샷을 유지합니다.</p>}
-        <button className="ghost-button" type="button" onClick={onClear}>기기 저장 데이터 지우기</button>
+        {SOURCE_FRESHNESS_STATUS.staleCount > 0 && <p className="source-freshness-note">공식 페이지 연결은 정상이어도 일정 내용 검토는 별개예요. {SOURCE_FRESHNESS_STATUS.staleCount}개 출처는 검토 주기가 지나 마지막 검토본을 표시하므로, 신청 전 공식 원문을 확인하세요.</p>}
+        {!clearConfirming ? (
+          <button className="ghost-button" type="button" onClick={() => setClearConfirming(true)}>기기 저장 데이터 지우기</button>
+        ) : (
+          <div className="settings-clear-confirm" role="alertdialog" aria-labelledby="settings-clear-title" aria-describedby="settings-clear-description">
+            <strong id="settings-clear-title">저장 데이터를 정말 지울까요?</strong>
+            <p id="settings-clear-description">관심 시험 {favoriteIds.length}개와 준비 체크 {checkedIds.length}개가 이 기기에서 삭제돼요.</p>
+            <div><button type="button" onClick={() => setClearConfirming(false)}>취소</button><button type="button" onClick={() => { onClear(); setClearConfirming(false); setStorageMessage("기기 저장 데이터를 지웠어요."); }}>정말 지우기</button></div>
+          </div>
+        )}
       </section>
 
       <section className="settings-card" aria-labelledby="settings-family">

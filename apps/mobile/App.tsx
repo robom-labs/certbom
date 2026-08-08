@@ -1,5 +1,12 @@
 // 오프라인 시험 탐색과 관심 시험 알림·공식 링크 흐름을 제공한다(시험 수는 카탈로그에서 동적 계산).
-import { catalogStats, exams, getExam, getNextEvent, type Exam } from "@certbom/core";
+import {
+  catalogStats,
+  exams,
+  getExam,
+  getNextEvent,
+  getOfficialExamActions,
+  type Exam,
+} from "@certbom/core";
 import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
@@ -20,10 +27,19 @@ import { parseExamDeepLink } from "./src/deep-link";
 import {
   cancelCertbomRemindersForExam,
   configureNotificationPresentation,
+  getScheduledCertbomReminders,
   reconcileCertbomReminders,
   scheduleExamReminder,
 } from "./src/notifications";
-import { loadFavoriteExamIds, loadSelectedExamId, saveFavoriteExamIds, saveSelectedExamId } from "./src/storage";
+import { formatPreparationPreview } from "./src/preparation-preview";
+import {
+  loadFavoriteExamIds,
+  loadReminderExamIds,
+  loadSelectedExamId,
+  saveFavoriteExamIds,
+  saveReminderExamIds,
+  saveSelectedExamId,
+} from "./src/storage";
 
 const SUPPORT_URL = process.env.EXPO_PUBLIC_SUPPORT_URL ?? "https://robom.kr/support";
 const PRIVACY_URL = process.env.EXPO_PUBLIC_PRIVACY_URL ?? "https://robom.kr/privacy/certbom";
@@ -57,7 +73,9 @@ function MobileApp() {
   const [isScheduling, setIsScheduling] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [scheduledReminderIds, setScheduledReminderIds] = useState<Record<string, string>>({});
+  const [reminderExamIds, setReminderExamIds] = useState<string[]>([]);
   const selectionMade = useRef(false);
+  const listRef = useRef<FlatList<Exam>>(null);
 
   const selectExam = useCallback((exam: Exam, message: string) => {
     selectionMade.current = true;
@@ -69,6 +87,10 @@ function MobileApp() {
       if (!saved) {
         setNotice("관심 시험은 현재 실행 중 유지되지만 기기 저장에는 실패했습니다.");
       }
+    });
+
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({ animated: true, offset: 0 });
     });
   }, []);
 
@@ -105,12 +127,30 @@ function MobileApp() {
       if (!mounted) return;
       setFavoriteExamIds(examIds.filter((examId) => Boolean(getExam(examId))));
     });
-    void reconcileCertbomReminders(exams)
-      .then((reminders) => {
+    void (async () => {
+      try {
+        const [storedIntent, scheduled] = await Promise.all([
+          loadReminderExamIds(),
+          getScheduledCertbomReminders(),
+        ]);
+        const inferredIds = [...new Set(scheduled.map((reminder) => reminder.examId))];
+        const intendedIds = (storedIntent.initialized ? storedIntent.examIds : inferredIds)
+          .filter((examId) => Boolean(getExam(examId)));
+
+        if (!storedIntent.initialized || intendedIds.length !== storedIntent.examIds.length) {
+          await saveReminderExamIds(intendedIds);
+        }
+
+        const reminders = await reconcileCertbomReminders(exams, intendedIds);
         if (!mounted) return;
-        setScheduledReminderIds(Object.fromEntries(reminders.map((reminder) => [reminder.examId, reminder.notificationId])));
-      })
-      .catch(() => undefined);
+        setReminderExamIds(intendedIds);
+        setScheduledReminderIds(
+          Object.fromEntries(reminders.map((reminder) => [reminder.examId, reminder.notificationId])),
+        );
+      } catch {
+        // 알림 저장소 오류가 시험 탐색과 공식 링크 사용을 막지 않게 한다.
+      }
+    })();
 
     return () => {
       mounted = false;
@@ -129,7 +169,14 @@ function MobileApp() {
           return;
         }
         if (isFavorite && removeReminder) {
+          const nextReminderIds = reminderExamIds.filter((examId) => examId !== exam.id);
+          const intentSaved = await saveReminderExamIds(nextReminderIds);
+          if (!intentSaved) {
+            setNotice("관심 시험은 해제했지만 알림 설정 저장에는 실패했습니다. 알림은 그대로 유지했어요.");
+            return;
+          }
           await cancelCertbomRemindersForExam(exam.id);
+          setReminderExamIds(nextReminderIds);
           setScheduledReminderIds((scheduled) => {
             const nextScheduled = { ...scheduled };
             delete nextScheduled[exam.id];
@@ -142,7 +189,7 @@ function MobileApp() {
       });
       return next;
     });
-  }, []);
+  }, [reminderExamIds]);
 
   const toggleFavorite = useCallback((exam: Exam) => {
     if (!favoriteExamIds.includes(exam.id)) {
@@ -210,6 +257,7 @@ function MobileApp() {
   const nextEvent = selectedExam ? getNextEvent(selectedExam) : undefined;
   const selectedIsFavorite = selectedExam ? favoriteExamIds.includes(selectedExam.id) : false;
   const selectedHasReminder = selectedExam ? Boolean(scheduledReminderIds[selectedExam.id]) : false;
+  const officialActions = selectedExam ? getOfficialExamActions(selectedExam) : [];
 
   const openExternalUrl = useCallback(async (url: string, label: string) => {
     try {
@@ -232,17 +280,33 @@ function MobileApp() {
       return;
     }
 
+    const nextReminderIds = [...new Set([...reminderExamIds, selectedExam.id])];
+    const intentSaved = await saveReminderExamIds(nextReminderIds);
+    if (!intentSaved) {
+      await cancelCertbomRemindersForExam(selectedExam.id);
+      setNotice("알림은 만들었지만 기기 설정에 저장하지 못해 안전하게 취소했습니다. 다시 시도해 주세요.");
+      return;
+    }
+
     setNotice(
       `${result.plan.eventTitle} 알림을 ${formatReminderDate(result.plan.date)}에 예약했습니다.`,
     );
+    setReminderExamIds(nextReminderIds);
     setScheduledReminderIds((current) => ({ ...current, [selectedExam.id]: result.notificationId }));
-  }, [isScheduling, selectedExam]);
+  }, [isScheduling, reminderExamIds, selectedExam]);
 
   const cancelReminder = useCallback(async () => {
     if (!selectedExam || isCancelling) return;
     setIsCancelling(true);
     try {
+      const nextReminderIds = reminderExamIds.filter((examId) => examId !== selectedExam.id);
+      const intentSaved = await saveReminderExamIds(nextReminderIds);
+      if (!intentSaved) {
+        setNotice("알림 설정을 기기에 저장하지 못해 기존 예약을 유지했습니다. 다시 시도해 주세요.");
+        return;
+      }
       const cancelled = await cancelCertbomRemindersForExam(selectedExam.id);
+      setReminderExamIds(nextReminderIds);
       setScheduledReminderIds((current) => {
         const next = { ...current };
         delete next[selectedExam.id];
@@ -254,7 +318,7 @@ function MobileApp() {
     } finally {
       setIsCancelling(false);
     }
-  }, [isCancelling, selectedExam]);
+  }, [isCancelling, reminderExamIds, selectedExam]);
 
   const header = (
     <View>
@@ -281,7 +345,7 @@ function MobileApp() {
             {selectedHasReminder ? <Text style={styles.reminderStatus}>이 시험의 로컬 알림이 예약되어 있어요.</Text> : null}
             {selectedExam.preparation.length > 0 ? (
               <Text style={styles.preparationHint}>
-                준비물 {selectedExam.preparation.slice(0, 3).join(' · ')}
+                준비물 {formatPreparationPreview(selectedExam.preparation)}
               </Text>
             ) : null}
             <View style={styles.actionGroup}>
@@ -341,6 +405,31 @@ function MobileApp() {
                 </Pressable>
               ) : null}
             </View>
+            {officialActions.length > 0 ? (
+              <View style={styles.officialActions}>
+                <Text style={styles.officialActionsTitle}>Q-Net 공식 도구</Text>
+                {officialActions.map((action) => (
+                  <Pressable
+                    accessibilityRole="link"
+                    key={action.id}
+                    onPress={() => void openExternalUrl(action.url, action.label)}
+                    style={({ pressed }) => [styles.officialAction, pressed && styles.pressed]}
+                  >
+                    <View style={styles.officialActionCopy}>
+                      <Text style={styles.officialActionLabel}>{action.label}</Text>
+                      <Text style={styles.officialActionDescription}>{action.description}</Text>
+                    </View>
+                    <Text
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                      style={styles.officialActionArrow}
+                    >
+                      ↗
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
           </>
         ) : (
           <Text style={styles.emptySelection}>아래 목록에서 시험 한 건을 선택해 주세요.</Text>
@@ -374,6 +463,7 @@ function MobileApp() {
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={styles.safeArea}>
       <FlatList
+        ref={listRef}
         contentContainerStyle={styles.listContent}
         data={filteredExams}
         extraData={selectedExam?.id}
@@ -530,6 +620,46 @@ const styles = StyleSheet.create({
   actionGroup: {
     marginTop: 16,
     gap: 9,
+  },
+  officialActions: {
+    marginTop: 18,
+    gap: 8,
+  },
+  officialActionsTitle: {
+    color: "#365b45",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  officialAction: {
+    minHeight: 60,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#d7e1da",
+    borderRadius: 14,
+    backgroundColor: "#f8fbf9",
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  officialActionCopy: {
+    flex: 1,
+  },
+  officialActionLabel: {
+    color: "#14633f",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  officialActionDescription: {
+    marginTop: 3,
+    color: "#5b6a61",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  officialActionArrow: {
+    color: "#18794e",
+    fontSize: 18,
+    fontWeight: "800",
   },
   favoriteButton: {
     minHeight: 48,

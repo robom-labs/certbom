@@ -12,6 +12,8 @@ import {
   exams,
   getExam,
   getHomeSummaryExams,
+  getOfficialExamActions,
+  getSameDayExamGroups,
   getUpcomingEventGroups,
   getUpcomingEvents,
   isApplicationOpen,
@@ -245,5 +247,69 @@ describe("캘린더 공유", () => {
     expect(createIcs(exam, event)).toContain("DTSTART;VALUE=DATE:20260716");
     expect(createIcs(exam, event)).toContain("DTEND;VALUE=DATE:20260718");
     expect(createGoogleCalendarUrl(exam, event)).toContain("dates=20260716%2F20260718");
+  });
+
+  it("긴 한글 일정과 URL을 UTF-8 75바이트 이하로 접어 캘린더 호환성을 지킨다", () => {
+    const exam = getExam("history-advanced");
+    const event = exam?.events[0];
+    if (!exam || !event) throw new Error("캘린더 테스트용 공식 일정이 없습니다.");
+    const longExam = {
+      ...exam,
+      name: `${exam.name} 아주 긴 한글 일정 이름과 안내 문구가 이어지는 시험`,
+    };
+    const ics = createCalendarIcs([{ exam: longExam, event }], "자격증봄 관심 시험과 매우 긴 캘린더 이름");
+    const physicalLines = ics.split("\r\n");
+    expect(physicalLines.some((line) => line.startsWith(" "))).toBe(true);
+    expect(physicalLines.every((line) => new TextEncoder().encode(line).length <= 75)).toBe(true);
+  });
+
+  it("설명 줄바꿈의 CR과 LF를 같은 ICS 이스케이프로 정규화한다", () => {
+    const exam = getExam("history-advanced");
+    const event = exam?.events[0];
+    if (!exam || !event) throw new Error("캘린더 테스트용 공식 일정이 없습니다.");
+    const customExam = { ...exam, name: "가\r\n나\r다\n라" };
+    const ics = createIcs(customExam, event);
+    expect(ics).not.toContain("\r\r");
+    expect(ics).toContain("가\\n나\\n다\\n라");
+  });
+});
+
+describe("공식 보조 도구", () => {
+  it("Q-Net 제한 종목과 실기 종목에 필요한 공식 도구만 제공한다", () => {
+    const restricted = getExam("industrial-safety-engineer");
+    if (!restricted) throw new Error("Q-Net 테스트 시험이 없습니다.");
+    const actions = getOfficialExamActions(restricted);
+    expect(actions.some((action) => action.id === "eligibility")).toBe(true);
+    expect(actions.some((action) => action.id === "practical-items")).toBe(restricted.practical);
+    expect(actions.every((action) => action.url.startsWith("https://www.q-net.or.kr/"))).toBe(true);
+    expect(actions.some((action) => action.label.includes("정답"))).toBe(false);
+  });
+
+  it("Q-Net이 아닌 시험에는 Q-Net 도구를 섞지 않는다", () => {
+    const exam = getExam("history-advanced");
+    if (!exam) throw new Error("비 Q-Net 테스트 시험이 없습니다.");
+    expect(getOfficialExamActions(exam)).toEqual([]);
+  });
+});
+
+describe("같은 날 시험 일정", () => {
+  it("서로 다른 관심 시험의 미래 시험일이 같을 때만 검토 목록을 만든다", () => {
+    const source = getExam("history-advanced");
+    const sourceEvent = source?.events[0];
+    if (!source || !sourceEvent) throw new Error("일정 테스트 시험이 없습니다.");
+    const event = {
+      ...sourceEvent,
+      type: "exam" as const,
+      startAt: "2026-09-20T09:00:00+09:00",
+      endAt: "2026-09-20T12:00:00+09:00",
+    };
+    const first = { ...source, id: "first", name: "첫 시험", events: [{ ...event, id: "first-event", examId: "first" }] };
+    const second = { ...source, id: "second", name: "둘째 시험", events: [{ ...event, id: "second-event", examId: "second" }] };
+    const third = { ...source, id: "third", name: "다른 날 시험", events: [{ ...event, id: "third-event", examId: "third", startAt: "2026-09-21T09:00:00+09:00" }] };
+
+    const groups = getSameDayExamGroups([first, second, third], new Date("2026-08-08T00:00:00+09:00"));
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.date).toBe("2026-09-20");
+    expect(new Set(groups[0]?.entries.map((entry) => entry.exam.id))).toEqual(new Set(["first", "second"]));
   });
 });

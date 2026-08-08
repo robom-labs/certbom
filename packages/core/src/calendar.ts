@@ -30,7 +30,29 @@ function nextDate(value: string) {
 }
 
 function escapeIcs(value: string) {
-  return value.replaceAll("\\", "\\\\").replaceAll("\n", "\\n").replaceAll(",", "\\,").replaceAll(";", "\\;");
+  return value
+    .replace(/\r\n?|\n/g, "\n")
+    .replaceAll("\\", "\\\\")
+    .replaceAll("\n", "\\n")
+    .replaceAll(",", "\\,")
+    .replaceAll(";", "\\;");
+}
+
+function foldIcsLine(line: string) {
+  const encoder = new TextEncoder();
+  const folded: string[] = [];
+  let current = "";
+  for (const character of line) {
+    const next = `${current}${character}`;
+    if (encoder.encode(next).length > 75) {
+      folded.push(current);
+      current = ` ${character}`;
+    } else {
+      current = next;
+    }
+  }
+  folded.push(current);
+  return folded;
 }
 
 function createEventLines(exam: Exam, event: ExamEvent, timestamp: string) {
@@ -70,7 +92,7 @@ export function createCalendarIcs(entries: CalendarEntry[], calendarName = "ìžê
     `X-WR-CALNAME:${escapeIcs(calendarName)}`,
     ...uniqueEntries.flatMap(({ exam, event }) => createEventLines(exam, event, timestamp)),
     "END:VCALENDAR",
-  ].join("\r\n");
+  ].flatMap(foldIcsLine).join("\r\n");
 }
 
 export function createIcs(exam: Exam, event: ExamEvent) {

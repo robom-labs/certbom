@@ -1,5 +1,9 @@
 // 자격증봄 데이터 운영의 경계·이상 감지·400일 시간 이동을 회귀 검사한다.
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 import test from "node:test";
 import {
   detectSourceAnomalies,
@@ -100,4 +104,25 @@ test("400일 시간 이동에 연도 전환과 다음 연도 대상이 끊기지
   assert.ok(result.years.includes(2026));
   assert.ok(result.years.includes(2027));
   assert.equal(result.yearTransitionCount, 1);
+});
+
+test("strict 동기화는 Q-Net 비밀키가 없으면 성공으로 위장하지 않는다", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "certbom-source-"));
+  const output = resolve(directory, "operation.json");
+  const environment = { ...process.env };
+  delete environment.QNET_SERVICE_KEY;
+
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [resolve(import.meta.dirname, "source-operations.mjs"), "sync", "--strict", "--output", output],
+      { cwd: resolve(import.meta.dirname, ".."), encoding: "utf8", env: environment },
+    );
+    assert.equal(result.status, 2, result.stderr || result.stdout);
+    const report = JSON.parse(await readFile(output, "utf8"));
+    assert.equal(report.status, "BLOCKED_EXTERNAL");
+    assert.match(report.reason, /QNET_SERVICE_KEY/);
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
 });

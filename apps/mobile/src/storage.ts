@@ -3,6 +3,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const SELECTED_EXAM_KEY = "certbom.mobile.selectedExamId.v1";
 const FAVORITE_EXAM_IDS_KEY = "certbom.mobile.favoriteExamIds.v1";
+const REMINDER_EXAM_IDS_KEY = "certbom.mobile.reminderExamIds.v1";
+
+function normalizeIds(value: unknown) {
+  return Array.isArray(value) ? [...new Set(value.filter((id): id is string => typeof id === "string"))] : [];
+}
 
 export async function loadSelectedExamId() {
   try {
@@ -25,10 +30,28 @@ export async function loadFavoriteExamIds(): Promise<string[]> {
   try {
     const value = await AsyncStorage.getItem(FAVORITE_EXAM_IDS_KEY);
     if (!value) return [];
-    const parsed: unknown = JSON.parse(value);
-    return Array.isArray(parsed) ? [...new Set(parsed.filter((id): id is string => typeof id === "string"))] : [];
+    return normalizeIds(JSON.parse(value));
   } catch {
     return [];
+  }
+}
+
+export async function loadReminderExamIds(): Promise<{ initialized: boolean; examIds: string[] }> {
+  try {
+    const value = await AsyncStorage.getItem(REMINDER_EXAM_IDS_KEY);
+    if (value === null) return { initialized: false, examIds: [] };
+    return { initialized: true, examIds: normalizeIds(JSON.parse(value)) };
+  } catch {
+    return { initialized: false, examIds: [] };
+  }
+}
+
+export async function saveReminderExamIds(examIds: string[]) {
+  try {
+    await AsyncStorage.setItem(REMINDER_EXAM_IDS_KEY, JSON.stringify(normalizeIds(examIds)));
+    return true;
+  } catch {
+    return false;
   }
 }
 
