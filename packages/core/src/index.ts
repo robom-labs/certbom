@@ -2,4 +2,6 @@
 export * from "./calendar";
 export * from "./catalog";
 export * from "./model";
+export * from "./official-actions";
 export * from "./recommend";
+export * from "./schedule-awareness";

@@ -1,5 +1,11 @@
 // 시험 상세에서 다음 행동·공식 일정·준비물·공유를 순서대로 제공한다.
-import { createGoogleCalendarUrl, createIcs, type Exam, type PreparationItem } from "@certbom/core";
+import {
+  createGoogleCalendarUrl,
+  createIcs,
+  getOfficialExamActions,
+  type Exam,
+  type PreparationItem,
+} from "@certbom/core";
 import { useState } from "react";
 import { trackFamilyEvent } from "../analytics";
 import { downloadTextFile } from "../download";
@@ -52,6 +58,7 @@ export function DetailScreen({ exam, favorite, checkedIds, storageError, onBack,
     .map((category) => ({ category, items: exam.preparation.filter((item) => item.category === category) }))
     .filter((group) => group.items.length > 0);
   const hasOfficialPreparation = exam.preparation.some((item) => item.sourceType === "official");
+  const officialActions = getOfficialExamActions(exam);
 
   const downloadIcs = () => {
     if (!calendarEvent) return;
@@ -104,6 +111,28 @@ export function DetailScreen({ exam, favorite, checkedIds, storageError, onBack,
       <section className="detail-card"><h2>이 시험은요.</h2><p>{exam.description}</p><dl><div><dt>일정 방식</dt><dd>{exam.scheduleType === "rolling" ? "상시 · 시험장별 날짜 선택" : exam.scheduleType === "announcement" ? "공고 확인형" : "회차별 정기 시험"}</dd></div><div><dt>시험 구성</dt><dd>{exam.practical ? "필기·실기 확인" : "필기 중심"}</dd></div><div><dt>일정 출처</dt><dd>{exam.sourceName}</dd></div>{exam.feeLabel && <div><dt>응시료</dt><dd>{exam.feeLabel}</dd></div>}</dl><p className="caution">{exam.caution}</p></section>
 
       <section className="detail-card"><div className="detail-card__head"><h2>{scheduleYearLabel(exam)}</h2><a href={exam.officialUrl} target="_blank" rel="noreferrer" onClick={() => trackFamilyEvent("official_exam_clicked", "exam-detail-schedule")}>원문 ↗</a></div>{exam.events.length ? <ol className="timeline">{exam.events.map((event) => <li key={event.id}><span aria-hidden="true" /><div><strong>{event.title}</strong><time dateTime={event.startAt}>{formatEventDate(event)}</time>{event.regionCode && <small>대상 지역 {event.regionCode === "ALL" ? "전 지역" : event.regionCode}</small>}</div></li>)}</ol> : <div className="inline-empty"><strong>{exam.scheduleType === "rolling" ? "시험장별 날짜를 직접 선택하는 상시 시험이에요." : "다음 확정 일정은 공식 페이지에서 확인해 주세요."}</strong><p>확인되지 않은 날짜를 임의로 만들지 않고 공식 접수처로 바로 연결합니다.</p></div>}</section>
+
+      {officialActions.length > 0 && (
+        <section className="detail-card" aria-labelledby="official-actions-title">
+          <h2 id="official-actions-title">Q-Net 공식 도구</h2>
+          <p>자격·시험 방식·결과·실기 준비를 공식 화면에서 바로 확인하세요.</p>
+          <div className="official-actions-grid">
+            {officialActions.map((officialAction) => (
+              <a
+                href={officialAction.url}
+                key={officialAction.id}
+                onClick={() => trackFamilyEvent("official_exam_clicked", `qnet-${officialAction.id}`)}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <strong>{officialAction.label}</strong>
+                <small>{officialAction.description}</small>
+                <span aria-hidden="true">↗</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="detail-card preparation-card">
         <h2>시험 당일 준비</h2>

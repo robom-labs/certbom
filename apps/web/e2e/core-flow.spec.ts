@@ -101,6 +101,10 @@ test("Q-Net 시험은 웹에서 확인한 공식 준비물을 출처와 함께 �
   // 공식 검증 항목(필수) + 입실·최종확인 일반 안내가 함께 있다.
   await expect(page.getByText("필수", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("checkbox", { name: /입실 마감/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Q-Net 공식 도구" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /응시자격 자가진단/ })).toHaveAttribute("href", /q-net\.or\.kr\/myp015\.do/);
+  await expect(page.getByRole("link", { name: /CBT 체험하기/ })).toHaveAttribute("href", /q-net\.or\.kr\/man001\.do/);
+  await expect(page.getByRole("link", { name: /실기 준비물 조회/ })).toHaveAttribute("href", /q-net\.or\.kr\/rcv013\.do/);
 });
 
 test("독립 시험 달력에서 날짜별 공식 일정을 보고 상세 뒤 상태를 복원한다", async ({ page }) => {
@@ -265,9 +269,11 @@ test("설정에서 세 패밀리 앱과 기기 저장·지원·개인정보·현
   await expect(page.locator("[data-family-app]")).toHaveCount(3);
   await expect(page.getByRole("link", { name: /문의와 지원/ })).toHaveAttribute("href", "https://robom.kr/support");
   await expect(page.getByRole("link", { name: /자격증봄 개인정보 처리방침/ })).toHaveAttribute("href", "https://robom.kr/privacy/certbom");
-  await expect(page.getByText("0.8.3", { exact: true })).toBeVisible();
+  await expect(page.getByText("0.8.4", { exact: true })).toBeVisible();
   await expect(page.getByText(/^104개 · 일정 \d+개$/)).toBeVisible();
   await expect(page.getByText(/\d+\/8곳 응답/)).toBeVisible();
+  await expect(page.getByText("검토 주기 경과 8곳", { exact: true })).toBeVisible();
+  await expect(page.getByText(/공식 페이지 연결은 정상이어도 일정 내용 검토는 별개/)).toBeVisible();
   await expect(page.getByText("로그인 없이 사용 · 외부 전송 없음", { exact: true })).toBeVisible();
   await expect(page.getByText(/로그인이나 계정 동기화는 아직 제공하지 않습니다/)).toBeVisible();
   await expect(page.getByText(/카카오 로그인/)).toHaveCount(0);
@@ -297,6 +303,27 @@ test("스토어 출시 전이라 설치 유도 CTA는 노출하지 않는다", a
   await page.getByRole("button", { name: "설정" }).click();
   await expect(page.getByRole("button", { name: "이 기기에 자격증봄 설치" })).toHaveCount(0);
   await expect(page.getByText("최신 앱 셸 사용 중")).toBeVisible();
+});
+
+test("한 번 연 앱은 네트워크가 끊겨도 PWA 셸을 다시 연다", async ({ context, page }, testInfo) => {
+  test.skip(testInfo.project.name !== "small-mobile", "대표 Chromium 모바일 프로젝트에서 서비스워커 오프라인을 검증합니다.");
+
+  await page.goto("/");
+  await page.evaluate(async () => {
+    if (!("serviceWorker" in navigator)) throw new Error("service worker를 지원하지 않는 환경입니다.");
+    await navigator.serviceWorker.ready;
+  });
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+
+  await context.setOffline(true);
+  try {
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: /지금 접수할 시험부터/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: "104개 시험 검색하기" })).toBeVisible();
+  } finally {
+    await context.setOffline(false);
+  }
 });
 
 test("홈과 설정 패밀리 셸에서 브라우저 오류가 없다", async ({ page }) => {

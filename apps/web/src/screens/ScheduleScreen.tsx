@@ -1,5 +1,5 @@
 // 관심 시험에서 다가오는 행동과 전체 캘린더 내보내기를 제공한다.
-import { createCalendarIcs, eventRelevantUntil, exams, getNextEvent } from "@certbom/core";
+import { createCalendarIcs, eventRelevantUntil, exams, getNextEvent, getSameDayExamGroups } from "@certbom/core";
 import { useState } from "react";
 import { AppHeader } from "../components/AppHeader";
 import { downloadTextFile } from "../download";
@@ -35,6 +35,7 @@ export function ScheduleScreen({ favoriteIds, checkedIds, onFind, onRecommend, o
     .flatMap((exam) => exam.events.map((event) => ({ exam, event })))
     .filter(({ event }) => eventRelevantUntil(event) >= Date.now())
     .sort((left, right) => new Date(left.event.startAt).getTime() - new Date(right.event.startAt).getTime());
+  const sameDayGroups = getSameDayExamGroups(favoriteExams);
 
   const exportCalendar = () => {
     if (calendarEntries.length === 0) return;
@@ -75,6 +76,21 @@ export function ScheduleScreen({ favoriteIds, checkedIds, onFind, onRecommend, o
             <small>저장한 파일은 휴대폰 캘린더에서 열 수 있어요. Google 캘린더는 PC의 가져오기 메뉴에서 추가할 수 있습니다.</small>
             {exportMessage && <p className="schedule-export__feedback" role="status">{exportMessage}</p>}
           </section>
+          {sameDayGroups.length > 0 && (
+            <section className="same-day-review" aria-labelledby="same-day-review-title">
+              <span>일정 미리 점검</span>
+              <h3 id="same-day-review-title">같은 날 시험 일정이 있어요.</h3>
+              <p>접수 전에 시험 시각과 이동 가능 여부를 공식 수험표에서 확인하세요.</p>
+              <ul>
+                {sameDayGroups.map((group) => (
+                  <li key={group.date}>
+                    <time dateTime={group.date}>{new Date(`${group.date}T00:00:00+09:00`).toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short", timeZone: "Asia/Seoul" })}</time>
+                    <span>{group.entries.map(({ exam }) => exam.shortName ?? exam.name).join(" · ")}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           <section className="schedule-agenda" aria-label="저장한 시험 일정">
             {favoriteExams.map((exam) => {
               const action = nextAction(exam);
