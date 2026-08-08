@@ -107,7 +107,7 @@ export function DetailScreen({ exam, favorite, checkedIds, storageError, onBack,
 
       <section className="next-action-card"><p>지금 해야 할 일</p><h2>{action.label}</h2><strong>{action.detail}</strong><a href={exam.applicationUrl ?? exam.officialUrl} target="_blank" rel="noreferrer" onClick={() => trackFamilyEvent("official_exam_clicked", "exam-detail-action")}>공식 접수처에서 확인 <span>↗</span></a></section>
 
-      <button className={`follow-button${favorite ? " is-on" : ""}`} type="button" aria-pressed={favorite} onClick={() => onToggleFavorite(exam.id)}>{favorite ? "★ 관심 시험으로 저장됨" : "☆ 관심 시험 저장하기"}</button>
+      <button className={`follow-button${favorite ? " is-on" : ""}`} type="button" aria-pressed={favorite} onClick={() => onToggleFavorite(exam.id)}>{favorite ? "관심 시험 저장됨 · 누르면 해제" : "관심 시험 저장하기"}</button>
 
       <section className="detail-card"><h2>이 시험은요.</h2><p>{exam.description}</p><dl><div><dt>일정 방식</dt><dd>{exam.scheduleType === "rolling" ? "상시 · 시험장별 날짜 선택" : exam.scheduleType === "announcement" ? "공고 확인형" : "회차별 정기 시험"}</dd></div><div><dt>시험 구성</dt><dd>{exam.practical ? "필기·실기 확인" : "필기 중심"}</dd></div><div><dt>일정 출처</dt><dd>{exam.sourceName}</dd></div>{exam.feeLabel && <div><dt>응시료</dt><dd>{exam.feeLabel}</dd></div>}</dl><p className="caution">{exam.caution}</p></section>
 

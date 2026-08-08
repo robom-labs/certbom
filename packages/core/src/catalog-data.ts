@@ -1,8 +1,9 @@
 // 공식 기관에서 확인한 2026 시험 종목과 일정 스냅샷을 구조화한다.
 import type { ExamEventType, PreparationItem, ScheduleType, TimePrecision, TrustLevel } from "./model";
+import { CATALOG_DATA_VERSION, CATALOG_REVIEWED_AT } from "./source-metadata.generated";
 
-export const CATALOG_UPDATED_AT = "2026-07-16T15:00:00+09:00";
-export const CATALOG_DATA_VERSION = "2026.07.20-v4";
+export { CATALOG_DATA_VERSION };
+export const CATALOG_UPDATED_AT = CATALOG_REVIEWED_AT;
 
 export type CatalogSource = {
   id: string;

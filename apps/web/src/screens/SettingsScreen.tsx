@@ -1,8 +1,12 @@
 // 패밀리 앱·게스트 상태·설치·접근성·개인정보·앱 메타를 한곳에서 관리한다.
-import { CATALOG_DATA_VERSION, CATALOG_UPDATED_AT, catalogStats } from "@certbom/core";
+import {
+  CATALOG_DATA_VERSION,
+  CATALOG_REVIEWED_AT,
+  SOURCE_CONNECTION_STATUS,
+  catalogStats,
+} from "@certbom/core";
 import { useEffect, useState } from "react";
 import { getAnalyticsAdapterKind, getAnalyticsConsent, isAnalyticsEnabled, setAnalyticsConsent } from "../analytics";
-import { guestFirstAuthAdapter } from "../auth";
 import { AppHeader } from "../components/AppHeader";
 import { FamilyIcon } from "../components/FamilyIcon";
 import { FONT_SCALE_KEY, applyFontScale, fontScales, readFontScale } from "../font-scale";
@@ -21,8 +25,6 @@ export function SettingsScreen({ favoriteCount, updateReady, onApplyUpdate, onCl
   const [online, setOnline] = useState(navigator.onLine);
   const [analyticsConsent, setAnalyticsConsentState] = useState(getAnalyticsConsent);
   const [storageMessage, setStorageMessage] = useState("");
-  const [authMessage, setAuthMessage] = useState("공급자 계정과 연결되지 않은 게스트 상태예요.");
-  const authState = guestFirstAuthAdapter.getState();
   const analyticsEnabled = isAnalyticsEnabled();
 
   useEffect(() => {
@@ -60,24 +62,10 @@ export function SettingsScreen({ favoriteCount, updateReady, onApplyUpdate, onCl
         <span className="status-chip">게스트로 바로 사용 중</span>
       </section>
 
-      <section className="settings-card" aria-labelledby="settings-account">
-        <h3 id="settings-account">계정과 동기화</h3>
-        <p>현재는 {authState.mode === "guest" ? "게스트 모드" : "계정 모드"}이며 관심 시험은 이 기기에만 저장됩니다.</p>
-        <div className="provider-grid">
-          {guestFirstAuthAdapter.getProviders().map((provider) => (
-            <button type="button" key={provider.id} onClick={() => setAuthMessage(guestFirstAuthAdapter.describeProvider(provider.id))}>
-              <strong>{provider.label}</strong>
-              <small>연결 준비 상태</small>
-            </button>
-          ))}
-        </div>
-        <small className="settings-feedback" aria-live="polite">{authMessage}</small>
-      </section>
-
-      <section className="settings-card" aria-labelledby="settings-notifications">
-        <h3 id="settings-notifications">알림과 권한</h3>
-        <p>웹 푸시 공급자는 아직 연결되지 않았어요. 알림 권한을 요청하거나 활성화된 것처럼 표시하지 않습니다.</p>
-        <span className="status-chip status-chip--neutral">알림 미연결 · 핵심 기능 정상</span>
+      <section className="settings-card" aria-labelledby="settings-storage">
+        <h3 id="settings-storage">저장 방식</h3>
+        <p>관심 시험과 준비물 체크는 이 기기에만 저장돼요. 로그인이나 계정 동기화는 아직 제공하지 않습니다.</p>
+        <span className="status-chip status-chip--neutral">로그인 없이 사용 · 외부 전송 없음</span>
       </section>
 
       <section className="settings-card" aria-labelledby="settings-accessibility">
@@ -106,21 +94,23 @@ export function SettingsScreen({ favoriteCount, updateReady, onApplyUpdate, onCl
         <dl>
           <div><dt>시험 데이터</dt><dd>{catalogStats.examCount}개 · 일정 {catalogStats.scheduledExamCount}개</dd></div>
           <div><dt>공식 출처</dt><dd>{catalogStats.sourceCount}개</dd></div>
-          <div><dt>마지막 확인</dt><dd>{new Date(CATALOG_UPDATED_AT).toLocaleDateString("ko-KR")}</dd></div>
+          <div><dt>일정 검토본</dt><dd>{new Date(CATALOG_REVIEWED_AT).toLocaleDateString("ko-KR")}</dd></div>
+          <div><dt>공식 페이지 점검</dt><dd>{SOURCE_CONNECTION_STATUS.healthyCount}/{SOURCE_CONNECTION_STATUS.totalCount}곳 응답 · {new Date(SOURCE_CONNECTION_STATUS.checkedAt).toLocaleDateString("ko-KR")}</dd></div>
           <div><dt>네트워크</dt><dd>{online ? "온라인" : "오프라인 · 저장 정보 표시"}</dd></div>
           <div><dt>기기 저장</dt><dd>관심 시험 {favoriteCount}개</dd></div>
         </dl>
+        {SOURCE_CONNECTION_STATUS.failedSourceIds.length > 0 && <p className="source-connection-note">자동 점검에서 응답하지 않은 {SOURCE_CONNECTION_STATUS.failedSourceIds.length}곳은 다음 점검 때 다시 시도합니다. 앱은 마지막 공식 검토 스냅샷을 유지합니다.</p>}
         <button className="ghost-button" type="button" onClick={onClear}>기기 저장 데이터 지우기</button>
       </section>
 
       <section className="settings-card" aria-labelledby="settings-family">
         <h3 id="settings-family"><FamilyIcon name="family" /> 로봄 패밀리 앱</h3>
-        <p>세 앱 모두 준비 중이며 2026년 8월 초 출시 예정이에요.</p>
+        <p>같은 로봄 패밀리 서비스를 각 웹 주소에서 열 수 있어요.</p>
         <ul className="family-app-list">
           {appMeta.familyApps.filter((app) => app.id !== "certbom").map((app) => (
             <li key={app.id} data-family-app={app.id}>
-              <a href={app.installUrl} target="_blank" rel="noreferrer">
-                <span><strong>{app.name}</strong><small>준비 중 · 2026년 8월 초 출시 예정</small></span>
+              <a href={app.webUrl} target="_blank" rel="noreferrer">
+                <span><strong>{app.name}</strong><small>웹에서 열기</small></span>
                 <span aria-hidden="true">↗</span>
               </a>
             </li>

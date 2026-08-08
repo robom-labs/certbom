@@ -1,13 +1,30 @@
 // 공식 일정 스냅샷을 앱에서 쓰는 시험 카탈로그와 탐색 도우미로 변환한다.
 import { CATALOG_DATA_VERSION, CATALOG_UPDATED_AT, catalogSources, examSeeds } from "./catalog-data";
 import type { Exam, ExamEvent, HomeSummaryFilter, PreparationItem } from "./model";
+import { CATALOG_REVIEWED_AT, SOURCE_CONNECTION_STATUS, SOURCE_REVIEWED_AT } from "./source-metadata.generated";
 
-export { CATALOG_DATA_VERSION, CATALOG_UPDATED_AT, catalogSources };
+export {
+  CATALOG_DATA_VERSION,
+  CATALOG_REVIEWED_AT,
+  CATALOG_UPDATED_AT,
+  SOURCE_CONNECTION_STATUS,
+  SOURCE_REVIEWED_AT,
+  catalogSources,
+};
 
 const GENERIC_PREPARATION_VERSION = "general-v2";
 export const UPCOMING_EXAM_HORIZON_DAYS = 14;
 
-const genericPreparation = (examId: string, source: string, practical: boolean): PreparationItem[] => {
+const sourceReviewedAt = (sourceId: string) => (
+  SOURCE_REVIEWED_AT[sourceId as keyof typeof SOURCE_REVIEWED_AT] ?? CATALOG_REVIEWED_AT
+);
+
+const genericPreparation = (
+  examId: string,
+  source: string,
+  practical: boolean,
+  reviewedAt: string,
+): PreparationItem[] => {
   const item = (
     id: string,
     category: PreparationItem["category"],
@@ -26,7 +43,7 @@ const genericPreparation = (examId: string, source: string, practical: boolean):
     sourceVerified: false,
     sourceType: "general",
     sourceLabel: "일반 시험 준비 안내",
-    lastVerifiedAt: CATALOG_UPDATED_AT,
+    lastVerifiedAt: reviewedAt,
     preparationVersion: GENERIC_PREPARATION_VERSION,
     legacyIds,
   });
@@ -121,7 +138,13 @@ type PrepDraft = {
   legacyOf?: string;
 };
 
-function sourcePreparation(examId: string, family: SourceFamily, officialUrl: string, practical: boolean): PreparationItem[] {
+function sourcePreparation(
+  examId: string,
+  family: SourceFamily,
+  officialUrl: string,
+  practical: boolean,
+  reviewedAt: string,
+): PreparationItem[] {
   const sourceLabelByFamily: Record<SourceFamily, string> = {
     qnet: "Q-Net 원서접수 유의사항",
     kdata: "데이터자격검정 응시자 유의사항",
@@ -179,7 +202,7 @@ function sourcePreparation(examId: string, family: SourceFamily, officialUrl: st
     sourceVerified: true,
     sourceType: "official",
     sourceLabel: sourceLabelByFamily[family],
-    lastVerifiedAt: CATALOG_UPDATED_AT,
+    lastVerifiedAt: reviewedAt,
     preparationVersion: SOURCE_PREPARATION_VERSION,
     legacyIds: [
       ...(draft.category === "identity" ? [`${examId}-identity-check`, `${examId}:general-v1:official-check`] : []),
@@ -187,7 +210,7 @@ function sourcePreparation(examId: string, family: SourceFamily, officialUrl: st
     ],
   }));
   // 입실 안내와 최종 확인은 일반 안내로 덧붙여, 검증 항목과 안내 항목을 구분한다.
-  const generic = genericPreparation(examId, officialUrl, false);
+  const generic = genericPreparation(examId, officialUrl, false, reviewedAt);
   const arrival = generic.find((item) => item.category === "arrival");
   const finalCheck = generic.find((item) => item.id.endsWith(":official-final-check"));
   if (arrival) items.push(arrival);
@@ -198,6 +221,7 @@ function sourcePreparation(examId: string, family: SourceFamily, officialUrl: st
 export const exams: Exam[] = examSeeds.map((seed) => {
   const officialUrl = seed.source.officialUrl;
   const sourceFamily = SOURCE_FAMILY_BY_ID[seed.source.id];
+  const reviewedAt = sourceReviewedAt(seed.source.id);
   const preparationVersion = seed.preparationVersion
     ?? (seed.preparation ? `${seed.id}-v1` : sourceFamily ? SOURCE_PREPARATION_VERSION : GENERIC_PREPARATION_VERSION);
   return {
@@ -216,7 +240,7 @@ export const exams: Exam[] = examSeeds.map((seed) => {
     applicationUrl: seed.source.applicationUrl,
     scheduleType: seed.scheduleType,
     trustLevel: seed.source.trustLevel,
-    lastVerifiedAt: CATALOG_UPDATED_AT,
+    lastVerifiedAt: reviewedAt,
     timePrecision: seed.timePrecision,
     practical: seed.practical,
     eligibilityRestricted: seed.eligibilityRestricted,
@@ -239,15 +263,15 @@ export const exams: Exam[] = examSeeds.map((seed) => {
       sourceVerified: item.sourceVerified ?? true,
       sourceType: item.sourceType ?? "official",
       sourceLabel: item.sourceLabel ?? seed.source.name,
-      lastVerifiedAt: item.lastVerifiedAt ?? CATALOG_UPDATED_AT,
+      lastVerifiedAt: item.lastVerifiedAt ?? reviewedAt,
       preparationVersion,
       legacyIds: [
         ...(item.legacyIds ?? []),
         preserveId ? item.id : `${seed.id}-${item.id}`,
       ],
     })) ?? (sourceFamily
-      ? sourcePreparation(seed.id, sourceFamily, officialUrl, seed.practical)
-      : genericPreparation(seed.id, officialUrl, seed.practical)),
+      ? sourcePreparation(seed.id, sourceFamily, officialUrl, seed.practical, reviewedAt)
+      : genericPreparation(seed.id, officialUrl, seed.practical, reviewedAt)),
     preparationVersion,
   };
 });

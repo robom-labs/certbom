@@ -55,8 +55,10 @@ test("시험 검색 후 상세와 관심 저장을 완료한다", async ({ page 
   await page.getByPlaceholder("시험명·별칭·기관·분야 검색").fill("한국사");
   await page.getByRole("button", { name: /한국사능력검정시험/ }).first().click();
   await expect(page.getByRole("heading", { name: "한국사능력검정시험" })).toBeVisible();
-  await page.getByRole("button", { name: "☆ 관심 시험 저장하기" }).click();
-  await expect(page.getByRole("button", { name: /관심 시험으로 저장됨/ })).toBeVisible();
+  await page.getByRole("button", { name: "관심 시험 저장하기" }).click();
+  await expect(
+    page.getByRole("button", { name: "관심 시험 저장됨 · 누르면 해제" }),
+  ).toBeVisible();
   await page.getByRole("checkbox", { name: /^수험표/ }).check();
 });
 
@@ -179,16 +181,51 @@ test("패밀리 wordmark와 선형 SVG 하단 메뉴가 모바일 터치 크기�
   expect(touchHeights.every((height) => height >= 48)).toBe(true);
 });
 
-test("설정에서 세 패밀리 앱과 게스트·지원·개인정보·현재 메타를 확인한다", async ({ page }) => {
+test("내 일정 빈 화면은 시험 찾기와 추천으로 바로 이어진다", async ({ page }) => {
+  await page.goto("/#schedule");
+  await expect(page.getByRole("heading", { name: "내 다음 일정" })).toBeVisible();
+  await expect(page.getByText("시험 하나만 저장하면 접수·시험·발표 순서로 정리해 드려요.")).toBeVisible();
+  const main = page.locator("#main-content");
+  await expect(main.getByRole("button", { name: "시험 찾기" })).toBeVisible();
+  await expect(main.getByRole("button", { name: "시험 추천받기" })).toBeVisible();
+});
+
+test("내 일정은 가까운 행동순으로 정렬하고 준비 진행률을 보여준다", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("certbom-favorites-v1", JSON.stringify(["history-advanced", "information-engineer"]));
+    window.localStorage.setItem(
+      "certbom-preparation-v2",
+      JSON.stringify(["history-advanced:history-v1:history-ticket"]),
+    );
+  });
+  await page.goto("/#schedule");
+  await expect(page.getByRole("region", { name: "내 일정 요약" })).toContainText("저장한 시험2개");
+  await expect(page.getByRole("region", { name: "저장한 시험 일정" }).locator("article")).toHaveCount(2);
+  await expect(page.getByText(/공식 자료 검토/)).toHaveCount(2);
+  await expect(page.locator(".agenda-card__progress").first()).toContainText(/준비 \d+\/\d+/);
+});
+
+test("설정에서 세 패밀리 앱과 기기 저장·지원·개인정보·현재 메타를 확인한다", async ({ page }) => {
   await page.goto("/#settings");
   await expect(page.locator("[data-family-app]")).toHaveCount(3);
   await expect(page.getByRole("link", { name: /문의와 지원/ })).toHaveAttribute("href", "https://robom.kr/support");
   await expect(page.getByRole("link", { name: /자격증봄 개인정보 처리방침/ })).toHaveAttribute("href", "https://robom.kr/privacy/certbom");
   await expect(page.getByText("0.8.3", { exact: true })).toBeVisible();
+  await expect(page.getByText(/^104개 · 일정 \d+개$/)).toBeVisible();
+  await expect(page.getByText(/5\/8곳 응답/)).toBeVisible();
+  await expect(page.getByText("로그인 없이 사용 · 외부 전송 없음", { exact: true })).toBeVisible();
+  await expect(page.getByText(/로그인이나 계정 동기화는 아직 제공하지 않습니다/)).toBeVisible();
+  await expect(page.getByText(/카카오 로그인/)).toHaveCount(0);
   await expect(page.getByRole("checkbox", { name: /익명 사용성 분석 허용/ })).not.toBeChecked();
+  await expect(page.getByRole("link", { name: /야외봄/ })).toHaveAttribute("href", "https://robom-labs.github.io/outbom/");
+  await expect(page.getByRole("link", { name: /청약봄/ })).toHaveAttribute("href", "https://robom-labs.github.io/homebom/");
+  await expect(page.getByRole("link", { name: /러닝봄/ })).toHaveAttribute("href", "https://robom-labs.github.io/runningbom/");
+});
 
-  await page.getByRole("button", { name: /카카오 연결 준비 상태/ }).click();
-  await expect(page.getByText(/카카오 로그인은 아직 연결되지 않았어요/)).toBeVisible();
+test("즐겨찾기 버튼에 장식용 별 문자를 사용하지 않는다", async ({ page }) => {
+  await page.goto("/#find");
+  await expect(page.locator("body")).not.toContainText("☆");
+  await expect(page.locator("body")).not.toContainText("★");
 });
 
 test("스토어 출시 전이라 설치 유도 CTA는 노출하지 않는다", async ({ page }) => {
@@ -223,6 +260,20 @@ test("홈과 설정 패밀리 셸에서 브라우저 오류가 없다", async ({
 test("320px에서 글자를 200%로 키워도 가로 넘침이 없다", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto("/");
+  const overflow = await page.evaluate(async () => {
+    document.documentElement.style.fontSize = "32px";
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+  });
+  expect(overflow).toBe(false);
+});
+
+test("320px·200% 글자에서 내 일정 카드도 가로 넘침이 없다", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("certbom-favorites-v1", JSON.stringify(["history-advanced", "information-engineer"]));
+  });
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/#schedule");
   const overflow = await page.evaluate(async () => {
     document.documentElement.style.fontSize = "32px";
     await new Promise((resolve) => requestAnimationFrame(resolve));

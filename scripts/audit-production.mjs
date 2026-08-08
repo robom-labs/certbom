@@ -2,6 +2,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { classifySecurityAdvisories, loadAuditExceptionPolicy } from "./audit-policy.mjs";
 
 const dirIndex = process.argv.indexOf("--dir");
 const targetDir = resolve(process.cwd(), dirIndex >= 0 ? process.argv[dirIndex + 1] : ".");
@@ -60,11 +61,20 @@ const advisories = Object.entries(advisoryMap).flatMap(([name, values]) =>
 const severityRank = { info: 0, low: 1, moderate: 2, high: 3, critical: 4 };
 advisories.sort((left, right) => (severityRank[right.severity] ?? -1) - (severityRank[left.severity] ?? -1));
 
+const policy = loadAuditExceptionPolicy(resolve(targetDir, "ops/security/audit-exceptions.json"));
+const { accepted, blocking } = classifySecurityAdvisories(advisories, packages, policy);
+
 for (const advisory of advisories) {
-  console.log(`[${advisory.severity}] ${advisory.name}: ${advisory.title} · ${advisory.url}`);
+  const acceptedException = accepted.find((entry) => entry.advisory.url === advisory.url);
+  const suffix = acceptedException
+    ? ` · accepted-build-only ${acceptedException.exception.id} until ${acceptedException.exception.expiresAt}`
+    : "";
+  console.log(`[${advisory.severity}] ${advisory.name}: ${advisory.title} · ${advisory.url}${suffix}`);
 }
 
-const blocking = advisories.filter((advisory) => (severityRank[advisory.severity] ?? -1) >= severityRank.high);
-console.log(`production audit: ${packages.size} packages · ${advisories.length} advisories · high/critical ${blocking.length}`);
+console.log(
+  `production audit: ${packages.size} packages · ${advisories.length} advisories · ` +
+  `accepted-build-only ${accepted.length} · blocking high/critical ${blocking.length}`,
+);
 
 if (blocking.length > 0) process.exitCode = 1;

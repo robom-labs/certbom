@@ -32,7 +32,7 @@ export function ExamCard({ exam, favorite, onOpen, onToggleFavorite, compact = f
         aria-label={`${exam.name} ${favorite ? "관심 해제" : "관심 저장"}`}
         aria-pressed={favorite}
       >
-        {favorite ? "★" : "☆"}
+        {favorite ? "저장됨" : "저장"}
       </button>
     </article>
   );

@@ -17,22 +17,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "20"
 
       - name: Run source monitor
-        run: node scripts/monitor-sources.mjs
+        run: node scripts/monitor-sources.mjs && node scripts/generate-source-metadata.mjs
 
       - name: Commit updated source-hashes.json if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if [ -n "$(git status --porcelain ops/source-registry/source-hashes.json)" ]; then
-            git add ops/source-registry/source-hashes.json
+          if [ -n "$(git status --porcelain ops/source-registry/source-hashes.json packages/core/src/source-metadata.generated.ts)" ]; then
+            git add ops/source-registry/source-hashes.json packages/core/src/source-metadata.generated.ts
             git commit -m "chore: update official-source content hashes"
             git push
           else

@@ -1,6 +1,6 @@
 // 홈에서 현재 접수·공식 일정·시험 찾기 행동을 첫 화면에 모아 보여준다.
 import {
-  CATALOG_UPDATED_AT,
+  CATALOG_REVIEWED_AT,
   catalogStats,
   exams,
   getHomeSummaryExams,
@@ -36,7 +36,7 @@ function verifiedMonth() {
     year: "numeric",
     month: "long",
     timeZone: "Asia/Seoul",
-  }).format(new Date(CATALOG_UPDATED_AT));
+  }).format(new Date(CATALOG_REVIEWED_AT));
 }
 
 export function HomeScreen({ selectedFilter, favorites, onFilterChange, onFind, onRecommend, onOpen, onToggleFavorite }: Props) {
@@ -72,7 +72,7 @@ export function HomeScreen({ selectedFilter, favorites, onFilterChange, onFind, 
     <main className="screen home-screen">
       <AppHeader />
       <section className="hero" aria-labelledby="hero-title">
-        <p className="hero__kicker">공식 일정 기준 · {verifiedMonth()} 확인</p>
+        <p className="hero__kicker">공식 일정 기준 · {verifiedMonth()} 검토본</p>
         <h2 id="hero-title">지금 접수할 시험부터<br /><mark>바로 찾아보세요.</mark></h2>
         <fieldset className="hero__stats">
           <legend className="sr-only">홈 시험 목록 필터</legend>

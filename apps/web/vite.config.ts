@@ -7,7 +7,8 @@ import { defineConfig } from "vitest/config";
 import pwaManifest from "./pwa-manifest.json";
 
 const packageMetadata = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")) as { version: string };
-const serviceWorkerCache = `certbom-${packageMetadata.version}`;
+const buildSha = process.env.VITE_BUILD_SHA ?? process.env.VERCEL_GIT_COMMIT_SHA ?? "local";
+const serviceWorkerCache = `certbom-${packageMetadata.version}-${buildSha.slice(0, 7)}`;
 const familyContractAssetNames = ["app-meta.json", "settings-contract.json", "feature-flags.json", "auth-config.json"] as const;
 
 function emitFamilyContractAssets(): Plugin {
@@ -51,7 +52,7 @@ export default defineConfig({
   ],
   define: {
     __APP_VERSION__: JSON.stringify(packageMetadata.version),
-    __BUILD_SHA__: JSON.stringify(process.env.VITE_BUILD_SHA ?? process.env.VERCEL_GIT_COMMIT_SHA ?? "local"),
+    __BUILD_SHA__: JSON.stringify(buildSha),
     __SERVICE_WORKER_CACHE__: JSON.stringify(serviceWorkerCache),
   },
   test: {

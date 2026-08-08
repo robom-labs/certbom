@@ -1,6 +1,9 @@
 // 확장된 시험 카탈로그·공식 일정·추천·캘린더의 핵심 불변조건을 검증한다.
 import { describe, expect, it } from "vitest";
 import {
+  CATALOG_DATA_VERSION,
+  CATALOG_REVIEWED_AT,
+  SOURCE_CONNECTION_STATUS,
   catalogStats,
   createGoogleCalendarUrl,
   createIcs,
@@ -18,6 +21,18 @@ import {
 } from "./index";
 
 describe("시험 카탈로그", () => {
+  it("카탈로그 검토 시각과 출처 연결 점검 시각을 구분한다", () => {
+    expect(CATALOG_DATA_VERSION).toBe("2026.07.24-v4");
+    expect(CATALOG_REVIEWED_AT).toBe("2026-07-24T14:30:00+09:00");
+    expect(SOURCE_CONNECTION_STATUS.healthyCount).toBe(5);
+    expect(SOURCE_CONNECTION_STATUS.totalCount).toBe(8);
+    expect(SOURCE_CONNECTION_STATUS.failedSourceIds).toHaveLength(3);
+
+    expect(getExam("information-engineer")?.lastVerifiedAt).toBe("2026-07-24T14:30:00+09:00");
+    const professionalExam = exams.find((exam) => exam.sourceId === "qnet-professional-calendar-2026");
+    expect(professionalExam?.lastVerifiedAt).toBe("2026-07-16T15:00:00+09:00");
+  });
+
   it("공식 출처 8곳의 시험 104개를 제공한다", () => {
     expect(exams).toHaveLength(104);
     expect(catalogStats.sourceCount).toBe(8);

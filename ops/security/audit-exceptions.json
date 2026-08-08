@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "exceptions": [
+    {
+      "id": "GHSA-w3rx-r6r6-pgpr",
+      "package": "image-size",
+      "advisoryUrl": "https://github.com/advisories/GHSA-w3rx-r6r6-pgpr",
+      "allowedVersions": ["1.2.1"],
+      "dependencyScope": "build-only",
+      "rationale": "Expo Metro의 로컬 번들 빌드 경로에서만 사용하며 자격증봄 런타임은 사용자 이미지나 ICNS/JXL 파일을 입력받아 분석하지 않는다.",
+      "reviewedAt": "2026-08-08",
+      "expiresAt": "2026-09-30"
+    },
+    {
+      "id": "GHSA-5p2g-fcmc-qvqq",
+      "package": "image-size",
+      "advisoryUrl": "https://github.com/advisories/GHSA-5p2g-fcmc-qvqq",
+      "allowedVersions": ["1.2.1"],
+      "dependencyScope": "build-only",
+      "rationale": "Expo Metro의 로컬 번들 빌드 경로에서만 사용하며 자격증봄 런타임은 사용자 이미지나 HEIF 파일을 입력받아 분석하지 않는다.",
+      "reviewedAt": "2026-08-08",
+      "expiresAt": "2026-09-30"
+    }
+  ]
+}
