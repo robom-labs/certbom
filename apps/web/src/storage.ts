@@ -52,7 +52,8 @@ export function useStoredIds(key: string, options: StoredIdOptions = {}) {
     setIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   }, []);
 
+  const replace = useCallback((nextIds: string[]) => setIds([...new Set(nextIds)]), []);
   const clear = useCallback(() => setIds([]), []);
 
-  return { ids, toggle, clear, saveFailed };
+  return { ids, toggle, replace, clear, saveFailed };
 }

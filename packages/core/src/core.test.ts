@@ -5,6 +5,7 @@ import {
   CATALOG_REVIEWED_AT,
   SOURCE_CONNECTION_STATUS,
   catalogStats,
+  createCalendarIcs,
   createGoogleCalendarUrl,
   createIcs,
   eventRelevantUntil,
@@ -219,6 +220,22 @@ describe("캘린더 공유", () => {
     const ics = createIcs(exam, event);
     expect(ics).toContain("BEGIN:VEVENT");
     expect(ics).toContain(event.officialSourceUrl);
+  });
+
+  it("여러 시험 일정을 한 파일로 만들고 같은 일정을 중복하지 않는다", () => {
+    const history = getExam("history-advanced");
+    const engineer = getExam("information-engineer");
+    const historyEvent = history?.events[0];
+    const engineerEvent = engineer?.events[0];
+    if (!history || !engineer || !historyEvent || !engineerEvent) throw new Error("묶음 캘린더 테스트 일정이 없습니다.");
+    const ics = createCalendarIcs([
+      { exam: engineer, event: engineerEvent },
+      { exam: history, event: historyEvent },
+      { exam: history, event: historyEvent },
+    ]);
+    expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(2);
+    expect(ics).toContain("X-WR-CALNAME:자격증봄 관심 시험");
+    expect(ics.indexOf(historyEvent.startAt.slice(0, 4))).toBeGreaterThanOrEqual(0);
   });
 
   it("날짜 범위를 끝 날짜 다음 날까지의 종일 일정으로 만든다", () => {

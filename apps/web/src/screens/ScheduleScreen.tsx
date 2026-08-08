@@ -1,6 +1,8 @@
-// 관심 시험에서 다가오는 행동을 날짜별 agenda로 보여준다.
-import { exams, getNextEvent } from "@certbom/core";
+// 관심 시험에서 다가오는 행동과 전체 캘린더 내보내기를 제공한다.
+import { createCalendarIcs, eventRelevantUntil, exams, getNextEvent } from "@certbom/core";
+import { useState } from "react";
 import { AppHeader } from "../components/AppHeader";
+import { downloadTextFile } from "../download";
 import { formatEventDate, nextAction } from "../format";
 
 type Props = {
@@ -12,6 +14,7 @@ type Props = {
 };
 
 export function ScheduleScreen({ favoriteIds, checkedIds, onFind, onRecommend, onOpen }: Props) {
+  const [exportMessage, setExportMessage] = useState("");
   const favoriteExams = exams
     .filter((exam) => favoriteIds.includes(exam.id))
     .sort((left, right) => {
@@ -28,6 +31,21 @@ export function ScheduleScreen({ favoriteIds, checkedIds, onFind, onRecommend, o
     0,
   );
   const nextExam = favoriteExams.find((exam) => getNextEvent(exam));
+  const calendarEntries = favoriteExams
+    .flatMap((exam) => exam.events.map((event) => ({ exam, event })))
+    .filter(({ event }) => eventRelevantUntil(event) >= Date.now())
+    .sort((left, right) => new Date(left.event.startAt).getTime() - new Date(right.event.startAt).getTime());
+
+  const exportCalendar = () => {
+    if (calendarEntries.length === 0) return;
+    const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
+    downloadTextFile(
+      createCalendarIcs(calendarEntries),
+      `certbom-saved-schedule-${date}.ics`,
+      "text/calendar;charset=utf-8",
+    );
+    setExportMessage(`${favoriteExams.length}개 시험의 다가오는 일정 ${calendarEntries.length}개를 저장했어요.`);
+  };
 
   return (
     <main className="screen schedule-screen">
@@ -46,6 +64,16 @@ export function ScheduleScreen({ favoriteIds, checkedIds, onFind, onRecommend, o
             <div><span>가장 가까운 일정</span><strong>{nextExam ? nextAction(nextExam).label : "공고 확인"}</strong></div>
             <div><span>준비 체크</span><strong>{checkedPreparation}/{totalPreparation}</strong></div>
             <progress max={Math.max(totalPreparation, 1)} value={checkedPreparation}>{checkedPreparation}개 완료</progress>
+          </section>
+          <section className="schedule-export" aria-labelledby="schedule-export-title">
+            <div>
+              <span>캘린더로 옮기기</span>
+              <h3 id="schedule-export-title">관심 시험 일정 한 번에 저장</h3>
+              <p>{favoriteExams.length}개 시험 · 다가오는 일정 {calendarEntries.length}개</p>
+            </div>
+            <button type="button" onClick={exportCalendar} disabled={calendarEntries.length === 0}>전체 일정 ICS 저장</button>
+            <small>저장한 파일은 휴대폰 캘린더에서 열 수 있어요. Google 캘린더는 PC의 가져오기 메뉴에서 추가할 수 있습니다.</small>
+            {exportMessage && <p className="schedule-export__feedback" role="status">{exportMessage}</p>}
           </section>
           <section className="schedule-agenda" aria-label="저장한 시험 일정">
             {favoriteExams.map((exam) => {

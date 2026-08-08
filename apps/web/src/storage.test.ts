@@ -23,6 +23,12 @@ describe("기기 저장", () => {
     expect(result.current.ids).toEqual([]);
   });
 
+  it("백업 복원 목록으로 교체하면서 중복 ID를 제거한다", () => {
+    const { result } = renderHook(() => useStoredIds("restore"));
+    act(() => result.current.replace(["exam-1", "exam-1", "exam-2"]));
+    expect(result.current.ids).toEqual(["exam-1", "exam-2"]);
+  });
+
   it("localStorage 쓰기가 실패해도 화면 상태를 유지한다", () => {
     const setItem = vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
       throw new Error("quota exceeded");

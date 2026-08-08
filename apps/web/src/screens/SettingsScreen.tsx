@@ -5,26 +5,31 @@ import {
   SOURCE_CONNECTION_STATUS,
   catalogStats,
 } from "@certbom/core";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getAnalyticsAdapterKind, getAnalyticsConsent, isAnalyticsEnabled, setAnalyticsConsent } from "../analytics";
 import { AppHeader } from "../components/AppHeader";
 import { FamilyIcon } from "../components/FamilyIcon";
+import { downloadTextFile } from "../download";
 import { FONT_SCALE_KEY, applyFontScale, fontScales, readFontScale } from "../font-scale";
 import appMeta from "../generated/robom-family/app-meta.json";
+import { createDeviceBackup, MAX_BACKUP_BYTES, parseDeviceBackup, type DeviceBackup } from "../local-backup";
 import { writeStoredValue } from "../storage";
 
 type Props = {
-  favoriteCount: number;
+  favoriteIds: string[];
+  checkedIds: string[];
   updateReady: boolean;
   onApplyUpdate?: () => void;
   onClear: () => void;
+  onRestoreData: (backup: Pick<DeviceBackup, "favoriteIds" | "checkedIds">) => void;
 };
 
-export function SettingsScreen({ favoriteCount, updateReady, onApplyUpdate, onClear }: Props) {
+export function SettingsScreen({ favoriteIds, checkedIds, updateReady, onApplyUpdate, onClear, onRestoreData }: Props) {
   const [scale, setScale] = useState(readFontScale);
   const [online, setOnline] = useState(navigator.onLine);
   const [analyticsConsent, setAnalyticsConsentState] = useState(getAnalyticsConsent);
   const [storageMessage, setStorageMessage] = useState("");
+  const backupInput = useRef<HTMLInputElement>(null);
   const analyticsEnabled = isAnalyticsEnabled();
 
   useEffect(() => {
@@ -51,6 +56,31 @@ export function SettingsScreen({ favoriteCount, updateReady, onApplyUpdate, onCl
     setStorageMessage(persisted ? "분석 동의 선택을 이 기기에 저장했어요." : "브라우저가 저장을 막아 분석 동의 선택은 이번 사용 중에만 유지돼요.");
   };
 
+  const exportBackup = () => {
+    const backup = createDeviceBackup(favoriteIds, checkedIds);
+    const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
+    downloadTextFile(
+      JSON.stringify(backup, null, 2),
+      `certbom-device-backup-${date}.json`,
+      "application/json;charset=utf-8",
+    );
+    setStorageMessage(`관심 시험 ${backup.favoriteIds.length}개와 준비 체크 ${backup.checkedIds.length}개를 백업했어요.`);
+  };
+
+  const importBackup = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      if (file.size > MAX_BACKUP_BYTES) throw new Error("백업 파일이 너무 큽니다.");
+      const backup = parseDeviceBackup(await file.text());
+      onRestoreData(backup);
+      setStorageMessage(`백업에서 관심 시험 ${backup.favoriteIds.length}개와 준비 체크 ${backup.checkedIds.length}개를 합쳤어요.`);
+    } catch (error) {
+      setStorageMessage(error instanceof Error ? error.message : "백업 파일을 불러오지 못했어요.");
+    } finally {
+      if (backupInput.current) backupInput.current.value = "";
+    }
+  };
+
   return (
     <main className="screen settings-screen">
       <AppHeader compact />
@@ -66,6 +96,24 @@ export function SettingsScreen({ favoriteCount, updateReady, onApplyUpdate, onCl
         <h3 id="settings-storage">저장 방식</h3>
         <p>관심 시험과 준비물 체크는 이 기기에만 저장돼요. 로그인이나 계정 동기화는 아직 제공하지 않습니다.</p>
         <span className="status-chip status-chip--neutral">로그인 없이 사용 · 외부 전송 없음</span>
+      </section>
+
+      <section className="settings-card" aria-labelledby="settings-backup">
+        <h3 id="settings-backup">기기 데이터 백업</h3>
+        <p>휴대폰 교체나 브라우저 초기화 전에 관심 시험과 준비 체크를 파일로 보관하세요. 불러오기는 현재 데이터에 안전하게 합쳐집니다.</p>
+        <div className="settings-data-actions">
+          <button type="button" onClick={exportBackup}>백업 파일 저장</button>
+          <button type="button" onClick={() => backupInput.current?.click()}>백업 불러오기</button>
+          <input
+            ref={backupInput}
+            className="settings-file-input"
+            type="file"
+            accept="application/json,.json"
+            aria-label="자격증봄 백업 파일 선택"
+            onChange={(event) => void importBackup(event.currentTarget.files?.[0])}
+          />
+        </div>
+        <small>백업 파일은 이 기기에서 직접 만들고 읽으며 외부 서버로 전송하지 않습니다.</small>
       </section>
 
       <section className="settings-card" aria-labelledby="settings-accessibility">
@@ -97,7 +145,7 @@ export function SettingsScreen({ favoriteCount, updateReady, onApplyUpdate, onCl
           <div><dt>일정 검토본</dt><dd>{new Date(CATALOG_REVIEWED_AT).toLocaleDateString("ko-KR")}</dd></div>
           <div><dt>공식 페이지 점검</dt><dd>{SOURCE_CONNECTION_STATUS.healthyCount}/{SOURCE_CONNECTION_STATUS.totalCount}곳 응답 · {new Date(SOURCE_CONNECTION_STATUS.checkedAt).toLocaleDateString("ko-KR")}</dd></div>
           <div><dt>네트워크</dt><dd>{online ? "온라인" : "오프라인 · 저장 정보 표시"}</dd></div>
-          <div><dt>기기 저장</dt><dd>관심 시험 {favoriteCount}개</dd></div>
+          <div><dt>기기 저장</dt><dd>관심 시험 {favoriteIds.length}개 · 준비 체크 {checkedIds.length}개</dd></div>
         </dl>
         {SOURCE_CONNECTION_STATUS.failedSourceIds.length > 0 && <p className="source-connection-note">자동 점검에서 응답하지 않은 {SOURCE_CONNECTION_STATUS.failedSourceIds.length}곳은 다음 점검 때 다시 시도합니다. 앱은 마지막 공식 검토 스냅샷을 유지합니다.</p>}
         <button className="ghost-button" type="button" onClick={onClear}>기기 저장 데이터 지우기</button>

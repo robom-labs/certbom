@@ -1,6 +1,7 @@
 // 검색·추천·관심 저장·상세 준비물과 접근성의 핵심 사용자 흐름을 검증한다.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 test("첫 화면에서 추천과 다음 행동이 짧은 스크롤 안에 보인다", async ({ page }) => {
   await page.goto("/");
@@ -205,6 +206,60 @@ test("내 일정은 가까운 행동순으로 정렬하고 준비 진행률을 �
   await expect(page.locator(".agenda-card__progress").first()).toContainText(/준비 \d+\/\d+/);
 });
 
+test("관심 시험의 다가오는 일정을 하나의 ICS 파일로 저장한다", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("certbom-favorites-v1", JSON.stringify(["history-advanced", "information-engineer"]));
+  });
+  await page.goto("/#schedule");
+  await expect(page.getByRole("heading", { name: "관심 시험 일정 한 번에 저장" })).toBeVisible();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "전체 일정 ICS 저장" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^certbom-saved-schedule-\d{4}-\d{2}-\d{2}\.ics$/);
+  const path = await download.path();
+  if (!path) throw new Error("다운로드한 ICS 파일 경로를 찾지 못했습니다.");
+  const contents = await readFile(path, "utf8");
+  expect(contents.match(/BEGIN:VEVENT/g)?.length ?? 0).toBeGreaterThan(1);
+  await expect(page.getByRole("status")).toContainText(/다가오는 일정 \d+개를 저장했어요/);
+});
+
+test("기기 데이터를 파일로 백업하고 현재 저장에 합쳐 복원한다", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("certbom-favorites-v1", JSON.stringify(["history-advanced"]));
+    window.localStorage.setItem("certbom-preparation-v2", JSON.stringify([]));
+  });
+  await page.goto("/#settings");
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "백업 파일 저장" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^certbom-device-backup-\d{4}-\d{2}-\d{2}\.json$/);
+  const path = await download.path();
+  if (!path) throw new Error("다운로드한 백업 파일 경로를 찾지 못했습니다.");
+  const exported = JSON.parse(await readFile(path, "utf8")) as { kind: string; favoriteIds: string[] };
+  expect(exported.kind).toBe("certbom-device-backup");
+  expect(exported.favoriteIds).toEqual(["history-advanced"]);
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "certbom-backup.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify({
+      kind: "certbom-device-backup",
+      version: 1,
+      exportedAt: "2026-08-08T00:00:00.000Z",
+      favoriteIds: ["information-engineer"],
+      checkedIds: ["information-engineer-identity-check"],
+    })),
+  });
+  await expect(page.getByText(/백업에서 관심 시험 1개와 준비 체크 1개를 합쳤어요/)).toBeVisible();
+  const restored = await page.evaluate(() => ({
+    favorites: JSON.parse(window.localStorage.getItem("certbom-favorites-v1") ?? "[]") as string[],
+    checked: JSON.parse(window.localStorage.getItem("certbom-preparation-v2") ?? "[]") as string[],
+  }));
+  expect(restored.favorites).toEqual(["history-advanced", "information-engineer"]);
+  expect(restored.checked).toEqual(["information-engineer:source-official-v1:identity"]);
+});
+
 test("설정에서 세 패밀리 앱과 기기 저장·지원·개인정보·현재 메타를 확인한다", async ({ page }) => {
   await page.goto("/#settings");
   await expect(page.locator("[data-family-app]")).toHaveCount(3);
@@ -280,4 +335,20 @@ test("320px·200% 글자에서 내 일정 카드도 가로 넘침이 없다", as
     return document.documentElement.scrollWidth > document.documentElement.clientWidth;
   });
   expect(overflow).toBe(false);
+});
+
+test("320px·200% 글자에서 일정 내보내기와 백업 버튼도 가로 넘침이 없다", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("certbom-favorites-v1", JSON.stringify(["history-advanced"]));
+  });
+  await page.setViewportSize({ width: 320, height: 568 });
+  for (const hash of ["schedule", "settings"]) {
+    await page.goto(`/#${hash}`);
+    const overflow = await page.evaluate(async () => {
+      document.documentElement.style.fontSize = "32px";
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+    });
+    expect(overflow).toBe(false);
+  }
 });

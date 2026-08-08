@@ -182,6 +182,14 @@ a { color: inherit; }
 .schedule-overview span { margin-bottom: 3px; color: var(--muted); font-size: .7rem; font-weight: 750; }
 .schedule-overview strong { overflow-wrap: anywhere; color: var(--blue-deep); font-size: .9rem; line-height: 1.35; }
 .schedule-overview > progress { grid-column: 1 / -1; width: 100%; height: 7px; accent-color: var(--blue); }
+.schedule-export { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px 14px; margin-bottom: 14px; padding: 17px; border: 1px solid #cbd5ff; border-radius: 20px; background: var(--surface); }
+.schedule-export span { display: block; color: var(--blue); font-size: .7rem; font-weight: 850; }
+.schedule-export h3 { margin: 2px 0 3px; font-size: 1rem; }
+.schedule-export p { margin: 0; color: var(--muted); font-size: .76rem; }
+.schedule-export > button { min-height: 48px; padding: 0 15px; border-radius: 14px; color: #fff; background: var(--blue); font-weight: 850; }
+.schedule-export > button:disabled { color: var(--muted); background: var(--surface-soft); cursor: not-allowed; }
+.schedule-export > small, .schedule-export__feedback { grid-column: 1 / -1; color: var(--muted); font-size: .7rem; line-height: 1.45; }
+.schedule-export__feedback { margin: -4px 0 0 !important; color: var(--green) !important; font-weight: 750; }
 .schedule-agenda { display: grid; gap: 11px; }
 .agenda-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 14px; margin-bottom: 11px; padding: 18px; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); box-shadow: 0 7px 18px rgba(31, 50, 105, .06); }
 .agenda-card__head { grid-column: 1 / -1; min-width: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
@@ -266,6 +274,10 @@ a { color: inherit; }
 .status-chip { min-height: 32px; display: inline-flex; align-items: center; padding: 0 11px; border-radius: 999px; color: #176447; background: #e1f7ec; font-size: .74rem; font-weight: 850; }
 .status-chip--neutral { color: var(--blue-deep); background: var(--blue-soft); }
 .settings-feedback { min-height: 22px; display: block; margin-top: 10px; color: var(--muted); font-size: .72rem; }
+.settings-data-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.settings-data-actions button { min-height: 48px; padding: 0 12px; border: 1px solid var(--line); border-radius: 13px; color: var(--blue-deep); background: var(--surface-soft); font-weight: 800; }
+.settings-data-actions button:first-child { border-color: var(--blue); color: #fff; background: var(--blue); }
+.settings-file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .settings-card dl { margin: 0 0 13px; }
 .settings-card dl div { min-height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); }
 .settings-card dt { color: var(--muted); }
@@ -363,6 +375,9 @@ a { color: inherit; }
   .schedule-overview { grid-template-columns: 1fr; }
   .schedule-overview > div:nth-child(2) { grid-column: auto; grid-row: auto; }
   .schedule-overview > progress { grid-column: auto; }
+  .schedule-export { grid-template-columns: 1fr; }
+  .schedule-export > button { width: 100%; }
+  .settings-data-actions { grid-template-columns: 1fr; }
   .agenda-card { grid-template-columns: 1fr; }
   .agenda-card time { max-width: none; text-align: left; }
   .provider-grid { grid-template-columns: 1fr; }

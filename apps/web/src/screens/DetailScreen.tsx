@@ -2,6 +2,7 @@
 import { createGoogleCalendarUrl, createIcs, type Exam, type PreparationItem } from "@certbom/core";
 import { useState } from "react";
 import { trackFamilyEvent } from "../analytics";
+import { downloadTextFile } from "../download";
 import { formatEventDate, nextAction, trustLabels } from "../format";
 
 type Props = {
@@ -55,16 +56,7 @@ export function DetailScreen({ exam, favorite, checkedIds, storageError, onBack,
   const downloadIcs = () => {
     if (!calendarEvent) return;
     trackFamilyEvent("calendar_added", "exam-detail-ics");
-    const blob = new Blob([createIcs(exam, calendarEvent)], { type: "text/calendar;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${exam.slug}.ics`;
-    link.hidden = true;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    downloadTextFile(createIcs(exam, calendarEvent), `${exam.slug}.ics`, "text/calendar;charset=utf-8");
   };
 
   const copyShareUrl = async () => {

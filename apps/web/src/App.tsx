@@ -227,7 +227,17 @@ export function App() {
     if (route.tab === "find") return <FindScreen favorites={favorites.ids} startRecommend={route.recommend} initialQuery={route.findQuery} initialFilter={route.findFilter} onStateChange={syncFindState} onOpen={openExam} onToggleFavorite={toggleFavorite} />;
     if (route.tab === "calendar") return <CalendarScreen favoriteIds={favorites.ids} state={route.calendar ?? calendarState()} onStateChange={syncCalendarState} onFind={() => navigateTab("find")} onOpen={openExam} />;
     if (route.tab === "schedule") return <ScheduleScreen favoriteIds={favorites.ids} checkedIds={checked.ids} onFind={() => navigateTab("find")} onRecommend={() => navigateTab("find", true)} onOpen={openExam} />;
-    if (route.tab === "settings") return <SettingsScreen favoriteCount={favorites.ids.length} updateReady={Boolean(applyUpdate)} onApplyUpdate={applyUpdate ?? undefined} onClear={() => { favorites.clear(); checked.clear(); }} />;
+    if (route.tab === "settings") return <SettingsScreen
+      favoriteIds={favorites.ids}
+      checkedIds={checked.ids}
+      updateReady={Boolean(applyUpdate)}
+      onApplyUpdate={applyUpdate ?? undefined}
+      onRestoreData={(backup) => {
+        favorites.replace([...favorites.ids, ...backup.favoriteIds]);
+        checked.replace([...checked.ids, ...backup.checkedIds]);
+      }}
+      onClear={() => { favorites.clear(); checked.clear(); }}
+    />;
     return <HomeScreen selectedFilter={route.homeFilter ?? "open"} favorites={favorites.ids} onFilterChange={(filter) => navigateTab("home", false, filter)} onFind={() => navigateTab("find")} onRecommend={() => navigateTab("find", true)} onOpen={openExam} onToggleFavorite={toggleFavorite} />;
   };
 
