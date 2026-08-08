@@ -24,9 +24,15 @@ describe("시험 카탈로그", () => {
   it("카탈로그 검토 시각과 출처 연결 점검 시각을 구분한다", () => {
     expect(CATALOG_DATA_VERSION).toBe("2026.07.24-v4");
     expect(CATALOG_REVIEWED_AT).toBe("2026-07-24T14:30:00+09:00");
-    expect(SOURCE_CONNECTION_STATUS.healthyCount).toBe(5);
     expect(SOURCE_CONNECTION_STATUS.totalCount).toBe(8);
-    expect(SOURCE_CONNECTION_STATUS.failedSourceIds).toHaveLength(3);
+    expect(SOURCE_CONNECTION_STATUS.healthyCount).toBeGreaterThanOrEqual(0);
+    expect(SOURCE_CONNECTION_STATUS.healthyCount).toBeLessThanOrEqual(SOURCE_CONNECTION_STATUS.totalCount);
+    expect(SOURCE_CONNECTION_STATUS.healthyCount + SOURCE_CONNECTION_STATUS.failedSourceIds.length).toBe(
+      SOURCE_CONNECTION_STATUS.totalCount,
+    );
+    expect(new Date(SOURCE_CONNECTION_STATUS.checkedAt).getTime()).toBeGreaterThan(
+      new Date(CATALOG_REVIEWED_AT).getTime(),
+    );
 
     expect(getExam("information-engineer")?.lastVerifiedAt).toBe("2026-07-24T14:30:00+09:00");
     const professionalExam = exams.find((exam) => exam.sourceId === "qnet-professional-calendar-2026");

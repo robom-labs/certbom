@@ -212,7 +212,7 @@ test("설정에서 세 패밀리 앱과 기기 저장·지원·개인정보·현
   await expect(page.getByRole("link", { name: /자격증봄 개인정보 처리방침/ })).toHaveAttribute("href", "https://robom.kr/privacy/certbom");
   await expect(page.getByText("0.8.3", { exact: true })).toBeVisible();
   await expect(page.getByText(/^104개 · 일정 \d+개$/)).toBeVisible();
-  await expect(page.getByText(/5\/8곳 응답/)).toBeVisible();
+  await expect(page.getByText(/\d+\/8곳 응답/)).toBeVisible();
   await expect(page.getByText("로그인 없이 사용 · 외부 전송 없음", { exact: true })).toBeVisible();
   await expect(page.getByText(/로그인이나 계정 동기화는 아직 제공하지 않습니다/)).toBeVisible();
   await expect(page.getByText(/카카오 로그인/)).toHaveCount(0);

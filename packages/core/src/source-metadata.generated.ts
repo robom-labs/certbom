@@ -15,12 +15,8 @@ export const SOURCE_REVIEWED_AT = {
 } as const;
 
 export const SOURCE_CONNECTION_STATUS = {
-  "checkedAt": "2026-08-07T18:35:26.020Z",
-  "healthyCount": 5,
+  "checkedAt": "2026-08-08T11:27:57.391Z",
+  "healthyCount": 8,
   "totalCount": 8,
-  "failedSourceIds": [
-    "gosi-announcement-2026",
-    "historyexam-schedule-2026",
-    "kpc-current-registration-2026"
-  ]
+  "failedSourceIds": []
 } as const;
