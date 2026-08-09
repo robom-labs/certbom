@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "kr.robom.certbom",
-      "versionCode": 10,
+      "versionCode": 13,
       "permissions": [
         "android.permission.POST_NOTIFICATIONS"
       ],
