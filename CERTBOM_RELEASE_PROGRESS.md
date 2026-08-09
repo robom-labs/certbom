@@ -31,7 +31,7 @@
 - 기준 branch는 `main`이다.
 - 작업 branch는 `r02/certbom-production-20260809`다.
 - 제출 AAB의 소스 SHA는 `5564dda1869dde7cd8f64e183cd2a1a061fb3b4b`다.
-- 진행 원장을 추가한 현재 `origin/main`과 작업 branch SHA는 `e181a43da5f1600d0dfdf50049d7e5bf22df3f16`다. 앱 소스 차이는 없고 문서만 추가됐다.
+- 진행 원장 최초 추가 커밋은 `e181a43da5f1600d0dfdf50049d7e5bf22df3f16`다. 이후 진행 상태 기록 커밋은 앱 소스를 바꾸지 않으며, 현재 `origin/main`은 `git rev-parse origin/main`으로 확인한다.
 - 최신 GitHub CI와 Family contract가 모두 성공했다.
 - 실제 공개 전이므로 production tag는 아직 생성하지 않았다.
 
