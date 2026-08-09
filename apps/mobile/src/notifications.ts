@@ -2,7 +2,7 @@
 import { getNextEvent, type Exam } from "@certbom/core";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
-import { createReminderPlan } from "./reminder";
+import { createReminderPlan, type ReminderDaysBefore } from "./reminder";
 
 const REMINDER_CHANNEL_ID = "certbom-reminders";
 
@@ -19,6 +19,7 @@ export type ReminderScheduleResult =
     };
 
 export type ScheduledExamReminder = {
+  daysBefore: ReminderDaysBefore;
   examId: string;
   dedupeKey: string;
   notificationId: string;
@@ -53,14 +54,21 @@ export async function getScheduledCertbomReminders(): Promise<ScheduledExamRemin
     if (typeof examId !== "string" || typeof dedupeKey !== "string" || !dedupeKey.startsWith("certbom:")) {
       return [];
     }
-    return [{ examId, dedupeKey, notificationId: notification.identifier }];
+    const rawDaysBefore = notification.content.data?.daysBefore;
+    const daysBefore = [1, 3, 7].includes(Number(rawDaysBefore))
+      ? Number(rawDaysBefore) as ReminderDaysBefore
+      : 1;
+    return [{ examId, daysBefore, dedupeKey, notificationId: notification.identifier }];
   });
 }
 
-export async function scheduleExamReminder(exam: Exam): Promise<ReminderScheduleResult> {
+export async function scheduleExamReminder(
+  exam: Exam,
+  daysBefore: ReminderDaysBefore = 1,
+): Promise<ReminderScheduleResult> {
   try {
     const nextEvent = getNextEvent(exam);
-    const plan = createReminderPlan(nextEvent);
+    const plan = createReminderPlan(nextEvent, new Date(), daysBefore);
     if (!plan) {
       return {
         ok: false,
@@ -108,7 +116,8 @@ export async function scheduleExamReminder(exam: Exam): Promise<ReminderSchedule
         data: {
           examId: exam.id,
           officialUrl: exam.officialUrl,
-          dedupeKey: `certbom:${exam.id}:${nextEvent?.id ?? "official"}:${plan.date.toISOString()}`,
+          daysBefore,
+          dedupeKey: `certbom:${exam.id}:${nextEvent?.id ?? "official"}:${daysBefore}d:${plan.date.toISOString()}`,
         },
         sound: "default",
       },
@@ -128,18 +137,25 @@ export async function scheduleExamReminder(exam: Exam): Promise<ReminderSchedule
 // 앱 시작 때 과거·삭제된 일정 알림을 치우고 일정 변경된 관심 시험만 다시 예약합니다.
 export async function reconcileCertbomReminders(
   exams: readonly Exam[],
-  intendedExamIds?: readonly string[],
+  preferences?: readonly { examId: string; daysBefore: ReminderDaysBefore }[],
 ): Promise<ScheduledExamReminder[]> {
   const scheduled = await getScheduledCertbomReminders();
   const byId = new Map(exams.map((exam) => [exam.id, exam]));
-  const intended = new Set(intendedExamIds ?? scheduled.map((reminder) => reminder.examId));
+  const requested = preferences ?? scheduled.map((reminder) => ({
+    examId: reminder.examId,
+    daysBefore: reminder.daysBefore,
+  }));
+  const intended = new Map(requested.map((preference) => [preference.examId, preference.daysBefore]));
   const exact = new Set<string>();
 
   await Promise.all(scheduled.map(async (reminder) => {
     const exam = byId.get(reminder.examId);
     const nextEvent = exam ? getNextEvent(exam) : undefined;
-    const plan = createReminderPlan(nextEvent);
-    const expectedKey = plan && exam ? `certbom:${exam.id}:${nextEvent?.id ?? "official"}:${plan.date.toISOString()}` : null;
+    const daysBefore = intended.get(reminder.examId) ?? reminder.daysBefore;
+    const plan = createReminderPlan(nextEvent, new Date(), daysBefore);
+    const expectedKey = plan && exam
+      ? `certbom:${exam.id}:${nextEvent?.id ?? "official"}:${daysBefore}d:${plan.date.toISOString()}`
+      : null;
     if (!intended.has(reminder.examId) || !exam || !plan || reminder.dedupeKey !== expectedKey || exact.has(reminder.examId)) {
       await Notifications.cancelScheduledNotificationAsync(reminder.notificationId);
       return;
@@ -147,10 +163,10 @@ export async function reconcileCertbomReminders(
     exact.add(reminder.examId);
   }));
 
-  for (const examId of intended) {
+  for (const [examId, daysBefore] of intended) {
     const exam = byId.get(examId);
-    if (!exam || exact.has(examId) || !createReminderPlan(getNextEvent(exam))) continue;
-    await scheduleExamReminder(exam);
+    if (!exam || exact.has(examId) || !createReminderPlan(getNextEvent(exam), new Date(), daysBefore)) continue;
+    await scheduleExamReminder(exam, daysBefore);
   }
 
   return getScheduledCertbomReminders();

@@ -50,6 +50,13 @@ describe("로컬 알림 시각", () => {
     expect(plan?.date.toISOString()).toBe("2026-08-09T00:00:00.000Z");
   });
 
+  it("사용자가 고른 3일·7일 전 시각을 그대로 계산한다", () => {
+    const now = new Date("2026-08-01T00:00:00+09:00");
+    const event = { startAt: "2026-08-10T00:00:00+09:00", title: "필기시험", timePrecision: "date-only" } as const;
+    expect(createReminderPlan(event, now, 3)?.date.toISOString()).toBe("2026-08-07T00:00:00.000Z");
+    expect(createReminderPlan(event, now, 7)?.date.toISOString()).toBe("2026-08-03T00:00:00.000Z");
+  });
+
   it("일정이 없거나 이미 지난 일정에는 임의 알림을 만들지 않는다", () => {
     const now = new Date("2026-08-01T00:00:00+09:00");
     expect(createReminderPlan(undefined, now)).toBeUndefined();

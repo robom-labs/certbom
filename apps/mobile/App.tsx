@@ -1,28 +1,42 @@
-// 오프라인 시험 탐색과 관심 시험 알림·공식 링크 흐름을 제공한다(시험 수는 카탈로그에서 동적 계산).
+// 자격증봄의 홈·시험 찾기·달력·알림·설정과 Android 뒤로가기를 네이티브 흐름으로 제공한다.
 import {
+  CATALOG_DATA_VERSION,
+  CATALOG_REVIEWED_AT,
   catalogStats,
+  createGoogleCalendarUrl,
   exams,
   getExam,
+  getHomeSummaryExams,
   getNextEvent,
   getOfficialExamActions,
+  getUpcomingEvents,
+  isApplicationOpen,
   type Exam,
+  type ExamEvent,
+  type HomeSummaryFilter,
 } from "@certbom/core";
+import * as IntentLauncher from "expo-intent-launcher";
 import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
+  BackHandler,
   FlatList,
-  Keyboard,
+  Modal,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { BomMark, NativeIcon, type NativeIconName } from "./src/brand";
 import { parseExamDeepLink } from "./src/deep-link";
 import {
   cancelCertbomRemindersForExam,
@@ -31,29 +45,64 @@ import {
   reconcileCertbomReminders,
   scheduleExamReminder,
 } from "./src/notifications";
-import { formatPreparationPreview } from "./src/preparation-preview";
+import type { ReminderDaysBefore } from "./src/reminder";
 import {
   loadFavoriteExamIds,
+  loadPreparationCheckedIds,
   loadReminderExamIds,
-  loadSelectedExamId,
+  loadReminderPreferences,
   saveFavoriteExamIds,
+  savePreparationCheckedIds,
   saveReminderExamIds,
+  saveReminderPreferences,
   saveSelectedExamId,
+  type StoredReminderPreference,
 } from "./src/storage";
 
+type TabId = "home" | "find" | "calendar" | "reminders" | "settings";
+
+const ROBOM_URL = "https://robom.kr/";
 const SUPPORT_URL = process.env.EXPO_PUBLIC_SUPPORT_URL ?? "https://robom.kr/support";
 const PRIVACY_URL = process.env.EXPO_PUBLIC_PRIVACY_URL ?? "https://robom.kr/privacy/certbom";
+const FAMILY_APPS = [
+  { id: "outbom", name: "야외봄", description: "지금 나가도 되는 날씨", url: "https://robom.kr/get/outbom" },
+  { id: "homebom", name: "청약봄", description: "청약 접수와 발표 일정", url: "https://robom.kr/get/homebom" },
+  { id: "runningbom", name: "러닝봄", description: "달리기 대회 접수 일정", url: "https://robom.kr/get/runningbom" },
+] as const;
+
+const tabs: { id: TabId; icon: NativeIconName; label: string }[] = [
+  { id: "home", icon: "home", label: "홈" },
+  { id: "find", icon: "search", label: "찾기" },
+  { id: "calendar", icon: "calendar", label: "달력" },
+  { id: "reminders", icon: "bell", label: "알림" },
+  { id: "settings", icon: "settings", label: "설정" },
+];
+
+const eventLabels: Record<ExamEvent["type"], string> = {
+  "application-open": "접수 시작",
+  "application-close": "접수 마감",
+  ticket: "수험표",
+  venue: "시험장",
+  exam: "시험",
+  result: "발표",
+  changed: "변경",
+  cancelled: "취소",
+};
 
 function normalize(value: string) {
   return value.toLocaleLowerCase("ko-KR").replaceAll(" ", "");
 }
 
-function formatEventDate(value: string) {
+function formatDate(value: string, includeYear = false) {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "공식 일정 확인 필요";
-  // date-only 이벤트 startAt은 자정 KST(+09:00)라 timeZone을 지정하지 않으면
-  // KST보다 서쪽 기기(UTC·미주 등)에서 시험일이 하루 전날로 표시된다.
-  return date.toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Seoul" });
+  if (Number.isNaN(date.getTime())) return "공식 일정 확인";
+  return date.toLocaleDateString("ko-KR", {
+    ...(includeYear ? { year: "numeric" as const } : {}),
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+    timeZone: "Asia/Seoul",
+  });
 }
 
 function formatReminderDate(value: Date) {
@@ -62,798 +111,541 @@ function formatReminderDate(value: Date) {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: "Asia/Seoul",
   });
 }
 
-function MobileApp() {
+function dateKey(value: string) {
+  return value.slice(0, 10);
+}
+
+function currentKstDateKey(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Seoul",
+  }).format(now);
+}
+
+function currentKstMonth() {
+  return currentKstDateKey().slice(0, 7);
+}
+
+function daysUntil(value: string) {
+  const today = currentKstDateKey();
+  const target = dateKey(value);
+  const day = 24 * 60 * 60 * 1000;
+  return Math.round((Date.parse(`${target}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / day);
+}
+
+function dDayLabel(value: string) {
+  const days = daysUntil(value);
+  if (days === 0) return "D-Day";
+  return days > 0 ? `D-${days}` : `D+${Math.abs(days)}`;
+}
+
+function monthLabel(month: string) {
+  const [year, value] = month.split("-").map(Number);
+  return `${year}년 ${value}월`;
+}
+
+function shiftMonth(month: string, amount: number) {
+  const [year, value] = month.split("-").map(Number);
+  const date = new Date(Date.UTC(year, value - 1 + amount, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthCells(month: string) {
+  const [year, value] = month.split("-").map(Number);
+  const leading = new Date(Date.UTC(year, value - 1, 1)).getUTCDay();
+  const days = new Date(Date.UTC(year, value, 0)).getUTCDate();
+  return [
+    ...Array.from({ length: leading }, () => null),
+    ...Array.from({ length: days }, (_, index) => `${month}-${String(index + 1).padStart(2, "0")}`),
+  ];
+}
+
+function eventAccent(type: ExamEvent["type"]) {
+  if (type === "application-open" || type === "application-close") return "#e76f2e";
+  if (type === "exam") return "#4058d8";
+  if (type === "result") return "#18794e";
+  return "#7a6ca8";
+}
+
+function BrandHeader({ compact = false, onOpenRobom }: { compact?: boolean; onOpenRobom: () => void }) {
+  return (
+    <Pressable
+      accessibilityHint="로봄 공식 홈페이지를 브라우저에서 엽니다"
+      accessibilityLabel="자격증봄 로봄 홈페이지 열기"
+      accessibilityRole="link"
+      onPress={onOpenRobom}
+      style={({ pressed }) => [styles.brandHeader, compact && styles.brandHeaderCompact, pressed && styles.pressed]}
+    >
+      <View style={styles.brandIcon}><Text style={styles.brandIconText}>✓</Text></View>
+      <View style={styles.brandCopy}>
+        {!compact && <Text style={styles.brandEyebrow}>robom · 놓치지 않는 시험 준비</Text>}
+        <View style={styles.wordmarkRow}>
+          <Text style={styles.wordmarkText}>자격증</Text>
+          <BomMark width={54} />
+        </View>
+      </View>
+      <View style={styles.robomLink}><Text style={styles.robomLinkText}>로봄</Text><NativeIcon color="#4058d8" name="external" size={16} /></View>
+    </Pressable>
+  );
+}
+
+function SectionTitle({ count, eyebrow, title }: { count?: number; eyebrow: string; title: string }) {
+  return (
+    <View style={styles.sectionTitleRow}>
+      <View><Text style={styles.sectionEyebrow}>{eyebrow}</Text><Text style={styles.sectionTitle}>{title}</Text></View>
+      {typeof count === "number" && <Text style={styles.sectionCount}>{count}건</Text>}
+    </View>
+  );
+}
+
+function ExamRow({ exam, favorite, onPress }: { exam: Exam; favorite: boolean; onPress: () => void }) {
+  const next = getNextEvent(exam);
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.examRow, pressed && styles.pressed]}>
+      <View style={styles.examRowCopy}>
+        <View style={styles.examNameRow}><Text numberOfLines={1} style={styles.examName}>{exam.name}</Text>{favorite && <Text style={styles.favoriteBadge}>관심</Text>}</View>
+        <Text numberOfLines={1} style={styles.examMeta}>{exam.organizer} · {exam.category}</Text>
+        <Text style={styles.examNext}>{next ? `${eventLabels[next.type]} · ${formatDate(next.startAt)}` : "공식 원문에서 일정 확인"}</Text>
+      </View>
+      <Text style={styles.chevron}>›</Text>
+    </Pressable>
+  );
+}
+
+function HomeScreen({ favoriteIds, onFind, onOpen, onSelectFilter, onShowReminders }: {
+  favoriteIds: string[];
+  onFind: () => void;
+  onOpen: (exam: Exam) => void;
+  onSelectFilter: (filter: HomeSummaryFilter) => void;
+  onShowReminders: () => void;
+}) {
+  const openAll = useMemo(() => getHomeSummaryExams("open"), []);
+  const open = openAll.slice(0, 5);
+  const upcoming = useMemo(() => getUpcomingEvents().slice(0, 5), []);
+  const upcomingExamCount = useMemo(() => getHomeSummaryExams("upcoming").length, []);
+  return (
+    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
+      <View style={styles.heroCard}>
+        <Text style={styles.heroKicker}>공식 일정 기준 · {new Date(CATALOG_REVIEWED_AT).toLocaleDateString("ko-KR", { year: "numeric", month: "long", timeZone: "Asia/Seoul" })} 검토본</Text>
+        <Text style={styles.heroTitle}>접수할 시험과{`\n`}다음 일정을 <Text style={styles.heroHighlight}>한눈에.</Text></Text>
+        <Text style={styles.heroDescription}>시험을 찾고 관심 목록에 저장하면 달력과 알림에서 이어서 관리할 수 있어요.</Text>
+        <Pressable accessibilityRole="button" onPress={onFind} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
+          <NativeIcon color="#ffffff" name="search" size={20} /><Text style={styles.primaryButtonText}>{catalogStats.examCount}개 시험 찾기</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.statGrid}>
+        {[
+          { filter: "all" as const, label: "전체 시험", value: catalogStats.examCount },
+          { filter: "open" as const, label: "현재 접수", value: openAll.length },
+          { filter: "upcoming" as const, label: "14일 내 시험", value: upcomingExamCount },
+        ].map((item) => (
+          <Pressable key={item.filter} onPress={() => onSelectFilter(item.filter)} style={({ pressed }) => [styles.statCard, pressed && styles.pressed]}>
+            <Text style={styles.statLabel}>{item.label}</Text><Text style={styles.statValue}>{item.value}<Text style={styles.statUnit}>개</Text></Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <Pressable onPress={onShowReminders} style={({ pressed }) => [styles.reminderSummary, pressed && styles.pressed]}>
+        <View style={styles.reminderSummaryIcon}><NativeIcon color="#4058d8" name="bell" /></View>
+        <View style={styles.reminderSummaryCopy}><Text style={styles.reminderSummaryTitle}>내 시험 알림 관리</Text><Text style={styles.reminderSummaryText}>관심 시험 {favoriteIds.length}개 · 알림 시점과 기기 설정 확인</Text></View>
+        <Text style={styles.chevron}>›</Text>
+      </Pressable>
+
+      <SectionTitle count={open.length} eyebrow="바로 확인" title="현재 접수 중" />
+      {open.length ? open.map((exam) => <ExamRow exam={exam} favorite={favoriteIds.includes(exam.id)} key={exam.id} onPress={() => onOpen(exam)} />) : (
+        <View style={styles.emptyCard}><Text style={styles.emptyTitle}>현재 접수 중인 시험이 없어요.</Text><Text style={styles.emptyText}>전체 시험과 공식 원문은 시험 찾기에서 확인할 수 있어요.</Text></View>
+      )}
+
+      <SectionTitle count={upcoming.length} eyebrow="날짜순" title="곧 해야 할 일" />
+      {upcoming.map(({ exam, event }) => (
+        <Pressable key={`${exam.id}-${event.id}`} onPress={() => onOpen(exam)} style={({ pressed }) => [styles.timelineRow, pressed && styles.pressed]}>
+          <View style={[styles.timelineAccent, { backgroundColor: eventAccent(event.type) }]} />
+          <View style={styles.timelineDate}><Text style={styles.timelineDay}>{dateKey(event.startAt).slice(8)}</Text><Text style={styles.timelineMonth}>{dateKey(event.startAt).slice(5, 7)}월</Text></View>
+          <View style={styles.timelineCopy}><Text style={styles.timelineLabel}>{eventLabels[event.type]} · {dDayLabel(event.startAt)}</Text><Text numberOfLines={1} style={styles.timelineTitle}>{exam.name}</Text><Text numberOfLines={1} style={styles.timelineMeta}>{event.title}</Text></View>
+          <Text style={styles.chevron}>›</Text>
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
+}
+
+function FindScreen({ favoriteIds, initialFilter, onOpen }: { favoriteIds: string[]; initialFilter: HomeSummaryFilter; onOpen: (exam: Exam) => void }) {
   const [query, setQuery] = useState("");
-  const [selectedExam, setSelectedExam] = useState<Exam>();
-  const [favoriteExamIds, setFavoriteExamIds] = useState<string[]>([]);
-  const [notice, setNotice] = useState("관심 시험을 한 건 고르면 기기에 저장할 수 있어요.");
-  const [isScheduling, setIsScheduling] = useState(false);
-  const [isCancelling, setIsCancelling] = useState(false);
-  const [scheduledReminderIds, setScheduledReminderIds] = useState<Record<string, string>>({});
-  const [reminderExamIds, setReminderExamIds] = useState<string[]>([]);
-  const selectionMade = useRef(false);
-  const listRef = useRef<FlatList<Exam>>(null);
+  const [filter, setFilter] = useState<HomeSummaryFilter>(initialFilter);
+  useEffect(() => setFilter(initialFilter), [initialFilter]);
+  const results = useMemo(() => {
+    const keyword = normalize(query);
+    return getHomeSummaryExams(filter).filter((exam) => !keyword || normalize([exam.name, exam.shortName, exam.organizer, exam.category, ...exam.aliases].filter(Boolean).join(" ")).includes(keyword));
+  }, [filter, query]);
+  return (
+    <View style={styles.flex}>
+      <View style={styles.findHeader}>
+        <Text style={styles.pageEyebrow}>공식 출처를 묶어 찾기</Text><Text style={styles.pageTitle}>시험 찾기</Text>
+        <View style={styles.searchBox}><NativeIcon name="search" size={21} /><TextInput accessibilityLabel="시험 검색" autoCorrect={false} onChangeText={setQuery} placeholder="시험명, 약칭, 기관 또는 분야" placeholderTextColor="#858ca0" returnKeyType="search" style={styles.searchInput} value={query} /></View>
+        <View style={styles.filterRow}>
+          {(["all", "open", "upcoming"] as const).map((value) => <Pressable accessibilityState={{ selected: filter === value }} key={value} onPress={() => setFilter(value)} style={[styles.filterChip, filter === value && styles.filterChipActive]}><Text style={[styles.filterChipText, filter === value && styles.filterChipTextActive]}>{value === "all" ? "전체" : value === "open" ? "접수 중" : "곧 시험"}</Text></Pressable>)}
+        </View>
+        <Text style={styles.resultCount}>검색 결과 {results.length}개</Text>
+      </View>
+      <FlatList contentContainerStyle={styles.findList} data={results} keyboardShouldPersistTaps="handled" keyExtractor={(exam) => exam.id} ListEmptyComponent={<View style={styles.emptyCard}><Text style={styles.emptyTitle}>조건에 맞는 시험이 없어요.</Text><Text style={styles.emptyText}>검색어를 지우거나 전체 필터로 바꿔 보세요.</Text></View>} renderItem={({ item }) => <ExamRow exam={item} favorite={favoriteIds.includes(item.id)} onPress={() => onOpen(item)} />} showsVerticalScrollIndicator={false} />
+    </View>
+  );
+}
 
-  const selectExam = useCallback((exam: Exam, message: string) => {
-    selectionMade.current = true;
-    setSelectedExam(exam);
-    setNotice(message);
-    Keyboard.dismiss();
+function CalendarScreen({ favoriteIds, onOpen }: { favoriteIds: string[]; onOpen: (exam: Exam) => void }) {
+  const [month, setMonth] = useState(currentKstMonth);
+  const [selectedDate, setSelectedDate] = useState(currentKstDateKey);
+  const [savedOnly, setSavedOnly] = useState(false);
+  const events = useMemo(() => exams.flatMap((exam) => exam.events.map((event) => ({ exam, event }))).filter(({ exam }) => !savedOnly || favoriteIds.includes(exam.id)), [favoriteIds, savedOnly]);
+  const eventDates = useMemo(() => new Set(events.map(({ event }) => dateKey(event.startAt))), [events]);
+  const selectedEvents = events.filter(({ event }) => dateKey(event.startAt) === selectedDate).sort((a, b) => a.event.startAt.localeCompare(b.event.startAt));
+  const cells = monthCells(month).map((key, index) => ({ id: key ?? `leading-${month}-${index}`, key }));
+  const changeMonth = (amount: number) => {
+    const next = shiftMonth(month, amount);
+    setMonth(next);
+    setSelectedDate(`${next}-01`);
+  };
+  return (
+    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
+      <View style={styles.pageTitleRow}><View><Text style={styles.pageEyebrow}>공식 일정 한눈에</Text><Text style={styles.pageTitle}>시험 달력</Text></View><Pressable accessibilityRole="button" onPress={() => setSavedOnly((value) => !value)} style={[styles.scopeButton, savedOnly && styles.scopeButtonActive]}><Text style={[styles.scopeButtonText, savedOnly && styles.scopeButtonTextActive]}>{savedOnly ? "관심만" : "전체"}</Text></Pressable></View>
+      <View style={styles.calendarCard}>
+        <View style={styles.monthHeader}><Pressable accessibilityLabel="이전 달" onPress={() => changeMonth(-1)} style={styles.monthButton}><NativeIcon name="back" /></Pressable><Text style={styles.monthTitle}>{monthLabel(month)}</Text><Pressable accessibilityLabel="다음 달" onPress={() => changeMonth(1)} style={styles.monthButton}><View style={{ transform: [{ rotate: "180deg" }] }}><NativeIcon name="back" /></View></Pressable></View>
+        <View style={styles.weekRow}>{["일", "월", "화", "수", "목", "금", "토"].map((day) => <Text key={day} style={styles.weekDay}>{day}</Text>)}</View>
+        <View style={styles.calendarGrid}>{cells.map((cell) => cell.key ? <Pressable accessibilityState={{ selected: selectedDate === cell.key }} key={cell.id} onPress={() => { if (cell.key) setSelectedDate(cell.key); }} style={[styles.dayCell, selectedDate === cell.key && styles.dayCellSelected, currentKstDateKey() === cell.key && styles.dayCellToday]}><Text style={[styles.dayNumber, selectedDate === cell.key && styles.dayNumberSelected]}>{Number(cell.key.slice(8))}</Text>{eventDates.has(cell.key) && <View style={[styles.eventDot, selectedDate === cell.key && styles.eventDotSelected]} />}</Pressable> : <View key={cell.id} style={styles.dayCell} />)}</View>
+      </View>
+      <SectionTitle count={selectedEvents.length} eyebrow={formatDate(`${selectedDate}T00:00:00+09:00`, true)} title="이날의 일정" />
+      {selectedEvents.length ? selectedEvents.map(({ exam, event }) => <Pressable key={`${exam.id}-${event.id}`} onPress={() => onOpen(exam)} style={({ pressed }) => [styles.agendaCard, pressed && styles.pressed]}><View style={[styles.agendaType, { backgroundColor: eventAccent(event.type) }]}><Text style={styles.agendaTypeText}>{eventLabels[event.type]}</Text></View><View style={styles.agendaCopy}><Text style={styles.agendaTitle}>{exam.name}</Text><Text style={styles.agendaMeta}>{event.title}</Text><Text style={styles.agendaSource}>{exam.sourceName} 공식 일정</Text></View><Text style={styles.chevron}>›</Text></Pressable>) : <View style={styles.emptyCard}><Text style={styles.emptyTitle}>이날 등록된 일정이 없어요.</Text><Text style={styles.emptyText}>날짜를 바꾸거나 전체 일정을 확인해 보세요.</Text></View>}
+    </ScrollView>
+  );
+}
 
-    void saveSelectedExamId(exam.id).then((saved) => {
-      if (!saved) {
-        setNotice("관심 시험은 현재 실행 중 유지되지만 기기 저장에는 실패했습니다.");
-      }
-    });
+function RemindersScreen({ favoriteIds, preferences, scheduledIds, notificationStatus, onEdit, onOpen, onOpenNotificationSettings }: {
+  favoriteIds: string[];
+  preferences: StoredReminderPreference[];
+  scheduledIds: Record<string, string>;
+  notificationStatus: Notifications.PermissionStatus | "unknown";
+  onEdit: (exam: Exam) => void;
+  onOpen: (exam: Exam) => void;
+  onOpenNotificationSettings: () => void;
+}) {
+  const favorites = favoriteIds.flatMap((id) => exams.filter((exam) => exam.id === id));
+  return (
+    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
+      <View style={styles.pageTitleRow}><View><Text style={styles.pageEyebrow}>기기에서 직접 울리는 알림</Text><Text style={styles.pageTitle}>알림 관리</Text></View><View style={styles.notificationStatus}><View style={[styles.statusDot, notificationStatus === "granted" ? styles.statusGood : styles.statusWarn]} /><Text style={styles.notificationStatusText}>{notificationStatus === "granted" ? "허용됨" : notificationStatus === "denied" ? "차단됨" : "확인 필요"}</Text></View></View>
+      <View style={styles.infoCard}><NativeIcon color="#4058d8" name="bell" /><View style={styles.infoCopy}><Text style={styles.infoTitle}>알림은 이 기기에만 저장돼요.</Text><Text style={styles.infoText}>관심 시험마다 1일·3일·7일 전을 선택할 수 있고, 앱을 재실행하면 변경된 공식 일정에 맞춰 다시 조정합니다.</Text></View></View>
+      {notificationStatus === "denied" && <Pressable onPress={onOpenNotificationSettings} style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}><Text style={styles.outlineButtonText}>기기 알림 설정 열기</Text><NativeIcon color="#4058d8" name="external" size={18} /></Pressable>}
+      <SectionTitle count={favorites.length} eyebrow="내가 저장한 시험" title="관심 시험별 알림" />
+      {favorites.length ? favorites.map((exam) => {
+        const preference = preferences.find((item) => item.examId === exam.id);
+        const scheduled = Boolean(scheduledIds[exam.id]);
+        const nextEvent = getNextEvent(exam);
+        return <View key={exam.id} style={styles.reminderCard}><Pressable onPress={() => onOpen(exam)} style={styles.reminderCardCopy}><Text style={styles.reminderExamName}>{exam.name}</Text><Text style={styles.reminderExamMeta}>{nextEvent ? formatDate(nextEvent.startAt, true) : "예약 가능한 미래 일정 없음"}</Text></Pressable><View style={[styles.reminderChip, scheduled && styles.reminderChipActive]}><Text style={[styles.reminderChipText, scheduled && styles.reminderChipTextActive]}>{scheduled && preference ? `${preference.daysBefore}일 전` : "알림 꺼짐"}</Text></View><Pressable accessibilityLabel={`${exam.name} 알림 설정`} onPress={() => onEdit(exam)} style={styles.editButton}><Text style={styles.editButtonText}>설정</Text></Pressable></View>;
+      }) : <View style={styles.emptyCard}><Text style={styles.emptyTitle}>저장한 관심 시험이 없어요.</Text><Text style={styles.emptyText}>시험 찾기에서 관심 시험을 저장하면 여기서 알림 시점을 고를 수 있어요.</Text></View>}
+    </ScrollView>
+  );
+}
 
-    requestAnimationFrame(() => {
-      listRef.current?.scrollToOffset({ animated: true, offset: 0 });
-    });
+function SettingsScreen({ notificationStatus, onOpenBatterySettings, onOpenNotificationSettings, onOpenUrl }: {
+  notificationStatus: Notifications.PermissionStatus | "unknown";
+  onOpenBatterySettings: () => void;
+  onOpenNotificationSettings: () => void;
+  onOpenUrl: (url: string, label: string) => void;
+}) {
+  return (
+    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
+      <Text style={styles.pageEyebrow}>내 기기에 맞게</Text><Text style={styles.pageTitle}>설정</Text>
+      <View style={styles.settingsCard}><Text style={styles.settingsTitle}>알림과 배터리</Text><Text style={styles.settingsText}>Android는 절전 상태에서 알림을 조금 늦출 수 있어요. 강제 예외 권한을 요구하지 않고, 사용자가 기기 설정에서 자격증봄을 직접 확인하도록 연결합니다.</Text><View style={styles.settingsActionList}><Pressable onPress={onOpenNotificationSettings} style={styles.settingsAction}><View><Text style={styles.settingsActionTitle}>앱 알림 설정</Text><Text style={styles.settingsActionMeta}>{notificationStatus === "granted" ? "현재 알림 허용됨" : "권한과 채널 상태 확인"}</Text></View><NativeIcon color="#4058d8" name="external" size={18} /></Pressable>{Platform.OS === "android" && <Pressable onPress={onOpenBatterySettings} style={styles.settingsAction}><View><Text style={styles.settingsActionTitle}>배터리 최적화 앱 목록</Text><Text style={styles.settingsActionMeta}>제조사 절전 설정에서 자격증봄 확인</Text></View><NativeIcon color="#4058d8" name="external" size={18} /></Pressable>}</View></View>
+      <View style={styles.settingsCard}><Text style={styles.settingsTitle}>로봄 패밀리 앱</Text><Text style={styles.settingsText}>앱 이름을 누르면 로봄 공식 연결 주소를 브라우저에서 열어요.</Text>{FAMILY_APPS.map((app) => <Pressable accessibilityRole="link" key={app.id} onPress={() => onOpenUrl(app.url, app.name)} style={styles.familyRow}><View><Text style={styles.familyName}>{app.name}</Text><Text style={styles.familyDescription}>{app.description}</Text></View><NativeIcon color="#4058d8" name="external" size={19} /></Pressable>)}</View>
+      <View style={styles.settingsCard}><Text style={styles.settingsTitle}>지원과 개인정보</Text><Pressable onPress={() => onOpenUrl(SUPPORT_URL, "지원 페이지")} style={styles.settingsAction}><Text style={styles.settingsActionTitle}>문의와 지원</Text><NativeIcon color="#4058d8" name="external" size={18} /></Pressable><Pressable onPress={() => onOpenUrl(PRIVACY_URL, "개인정보 처리방침")} style={styles.settingsAction}><Text style={styles.settingsActionTitle}>개인정보 처리방침</Text><NativeIcon color="#4058d8" name="external" size={18} /></Pressable></View>
+      <View style={styles.settingsCard}><Text style={styles.settingsTitle}>앱 정보</Text><View style={styles.metaRow}><Text style={styles.metaLabel}>시험 데이터</Text><Text style={styles.metaValue}>{catalogStats.examCount}개 · 일정 {catalogStats.eventCount}개</Text></View><View style={styles.metaRow}><Text style={styles.metaLabel}>데이터 버전</Text><Text style={styles.metaValue}>{CATALOG_DATA_VERSION}</Text></View><View style={styles.metaRow}><Text style={styles.metaLabel}>저장 방식</Text><Text style={styles.metaValue}>계정 없이 기기 저장</Text></View><Text style={styles.officialNotice}>자격증봄은 공식 시험기관이 아닙니다. 접수·응시자격·일정은 시행기관의 최신 공고가 최종 기준입니다.</Text></View>
+    </ScrollView>
+  );
+}
+
+function DetailScreen({ checkedPreparationIds, exam, favorite, reminder, onBack, onEditReminder, onOpenUrl, onToggleFavorite, onTogglePreparation }: {
+  checkedPreparationIds: string[];
+  exam: Exam;
+  favorite: boolean;
+  reminder?: StoredReminderPreference;
+  onBack: () => void;
+  onEditReminder: () => void;
+  onOpenUrl: (url: string, label: string) => void;
+  onToggleFavorite: () => void;
+  onTogglePreparation: (itemId: string) => void;
+}) {
+  const next = getNextEvent(exam);
+  const officialActions = getOfficialExamActions(exam);
+  const applicationUrl = exam.applicationUrl;
+  const checkedCount = exam.preparation.filter((item) => checkedPreparationIds.includes(item.id)).length;
+  const requiredIncomplete = exam.preparation.filter((item) => item.importance === "required" && !checkedPreparationIds.includes(item.id)).length;
+  return (
+    <View style={styles.flex}>
+      <View style={styles.detailHeader}><Pressable accessibilityLabel="이전 화면" onPress={onBack} style={styles.backButton}><NativeIcon name="back" /></Pressable><Text numberOfLines={1} style={styles.detailHeaderTitle}>{exam.name}</Text><View style={styles.backButton} /></View>
+      <ScrollView contentContainerStyle={styles.detailContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.detailHero}><Text style={styles.detailCategory}>{exam.category} · {exam.organizer}</Text><Text style={styles.detailTitle}>{exam.name}</Text><Text style={styles.detailDescription}>{exam.description}</Text><View style={styles.detailBadgeRow}><Text style={styles.detailBadge}>{isApplicationOpen(exam) ? "현재 접수 중" : "공식 일정 확인"}</Text><Text style={styles.detailBadge}>{exam.sourceName}</Text></View></View>
+        <View style={styles.nextEventCard}><Text style={styles.nextEventLabel}>다음 일정 {next ? `· ${dDayLabel(next.startAt)}` : ""}</Text><Text style={styles.nextEventTitle}>{next?.title ?? "공식 원문에서 확인"}</Text><Text style={styles.nextEventDate}>{next ? formatDate(next.startAt, true) : "확정된 미래 일정이 없어요."}</Text></View>
+        <View style={styles.detailActions}><Pressable onPress={onToggleFavorite} style={[styles.outlineButton, favorite && styles.outlineButtonActive]}><Text style={[styles.outlineButtonText, favorite && styles.outlineButtonTextActive]}>{favorite ? "관심 시험 저장됨" : "관심 시험에 저장"}</Text></Pressable><Pressable disabled={!next} onPress={onEditReminder} style={[styles.primaryButton, !next && styles.disabled]}><NativeIcon color="#ffffff" name="bell" size={20} /><Text style={styles.primaryButtonText}>{reminder ? `${reminder.daysBefore}일 전 알림 설정됨` : "알림 설정"}</Text></Pressable></View>
+        <SectionTitle count={exam.events.length} eyebrow="공식 출처 기준" title="주요 일정" />
+        {exam.events.slice().sort((a, b) => a.startAt.localeCompare(b.startAt)).map((event) => <View key={event.id} style={styles.detailEventRow}><View style={[styles.detailEventDot, { backgroundColor: eventAccent(event.type) }]} /><View style={styles.detailEventCopy}><Text style={styles.detailEventType}>{eventLabels[event.type]}</Text><Text style={styles.detailEventTitle}>{event.title}</Text><Text style={styles.detailEventDate}>{formatDate(event.startAt, true)}</Text></View></View>)}
+        {next && <Pressable onPress={() => onOpenUrl(createGoogleCalendarUrl(exam, next), "Google 캘린더")} style={styles.outlineButton}><Text style={styles.outlineButtonText}>다음 일정을 Google 캘린더에 추가</Text><NativeIcon color="#4058d8" name="external" size={18} /></Pressable>}
+        <SectionTitle count={exam.preparation.length} eyebrow="시험 전 확인" title="준비물과 주의사항" />
+        <View accessibilityLabel={`준비물 ${exam.preparation.length}개 중 ${checkedCount}개 완료`} accessibilityRole="summary" style={styles.preparationProgress}><View style={styles.preparationProgressCopy}><Text style={styles.preparationProgressTitle}>준비 {checkedCount}/{exam.preparation.length}</Text><Text style={styles.preparationProgressMeta}>필수 미완료 {requiredIncomplete}개</Text></View><View style={styles.preparationProgressTrack}><View style={[styles.preparationProgressValue, { width: `${exam.preparation.length ? Math.round((checkedCount / exam.preparation.length) * 100) : 0}%` }]} /></View></View>
+        {exam.preparation.map((item) => {
+          const checked = checkedPreparationIds.includes(item.id);
+          return <Pressable accessibilityRole="checkbox" accessibilityState={{ checked }} key={item.id} onPress={() => onTogglePreparation(item.id)} style={({ pressed }) => [styles.preparationRow, checked && styles.preparationRowChecked, pressed && styles.pressed]}><View style={[styles.preparationCheckbox, checked && styles.preparationCheckboxChecked]}>{checked && <Text style={styles.preparationCheckText}>✓</Text>}</View><View style={styles.preparationCopy}><View style={styles.preparationTitleRow}><Text style={[styles.preparationTitle, checked && styles.preparationTitleChecked]}>{item.label}</Text><View style={[styles.preparationMark, item.importance === "required" && styles.preparationMarkRequired, item.importance === "forbidden" && styles.preparationMarkForbidden]} /></View><Text style={styles.preparationText}>{item.detail}</Text><Text style={styles.preparationSource}>{item.sourceVerified ? `${item.sourceLabel} 확인` : "일반 준비 안내 · 공식 원문 재확인"}</Text></View></Pressable>;
+        })}
+        <Pressable onPress={() => onOpenUrl(exam.officialUrl, "공식 시험 페이지")} style={styles.settingsAction}><Text style={styles.settingsActionTitle}>공식 시험 페이지</Text><NativeIcon color="#4058d8" name="external" size={18} /></Pressable>
+        {applicationUrl && applicationUrl !== exam.officialUrl && <Pressable onPress={() => onOpenUrl(applicationUrl, "공식 접수처")} style={styles.settingsAction}><Text style={styles.settingsActionTitle}>공식 접수처</Text><NativeIcon color="#4058d8" name="external" size={18} /></Pressable>}
+        {officialActions.map((action) => <Pressable key={action.id} onPress={() => onOpenUrl(action.url, action.label)} style={styles.settingsAction}><View><Text style={styles.settingsActionTitle}>{action.label}</Text><Text style={styles.settingsActionMeta}>{action.description}</Text></View><NativeIcon color="#4058d8" name="external" size={18} /></Pressable>)}
+      </ScrollView>
+    </View>
+  );
+}
+
+function ReminderEditor({ exam, existing, onCancel, onRemove, onSave, saving }: {
+  exam: Exam;
+  existing?: StoredReminderPreference;
+  onCancel: () => void;
+  onRemove: () => void;
+  onSave: (daysBefore: ReminderDaysBefore) => void;
+  saving: boolean;
+}) {
+  const [daysBefore, setDaysBefore] = useState<ReminderDaysBefore>(existing?.daysBefore ?? 1);
+  const next = getNextEvent(exam);
+  return (
+    <Modal animationType="slide" onRequestClose={onCancel} transparent visible>
+      <View style={styles.modalBackdrop}><View style={styles.modalSheet}><View style={styles.modalHandle} /><View style={styles.modalHeader}><View><Text style={styles.pageEyebrow}>로컬 알림 설정</Text><Text style={styles.modalTitle}>{exam.name}</Text></View><Pressable accessibilityLabel="알림 설정 닫기" onPress={onCancel} style={styles.closeButton}><Text style={styles.closeButtonText}>닫기</Text></Pressable></View><View style={styles.modalEvent}><Text style={styles.nextEventLabel}>알림 기준 일정</Text><Text style={styles.nextEventTitle}>{next?.title ?? "예약 가능한 일정 없음"}</Text><Text style={styles.nextEventDate}>{next ? formatDate(next.startAt, true) : "공식 원문을 확인해 주세요."}</Text></View><Text style={styles.optionTitle}>언제 알려드릴까요?</Text><View style={styles.reminderOptions}>{([7, 3, 1] as const).map((days) => <Pressable accessibilityState={{ selected: daysBefore === days }} key={days} onPress={() => setDaysBefore(days)} style={[styles.reminderOption, daysBefore === days && styles.reminderOptionActive]}><Text style={[styles.reminderOptionValue, daysBefore === days && styles.reminderOptionValueActive]}>{days}일 전</Text><Text style={[styles.reminderOptionHint, daysBefore === days && styles.reminderOptionHintActive]}>{days === 1 ? "가장 가까운 기본 알림" : `${days}일 전에 미리 준비`}</Text></Pressable>)}</View><Text style={styles.modalNotice}>날짜만 공개된 일정은 선택한 날짜의 오전 9시를 기준으로 알립니다. Android 절전 상태에서는 운영체제가 알림을 조금 늦출 수 있어요.</Text><Pressable disabled={saving || !next} onPress={() => onSave(daysBefore)} style={[styles.primaryButton, (saving || !next) && styles.disabled]}>{saving ? <ActivityIndicator color="#ffffff" /> : <><NativeIcon color="#ffffff" name="bell" size={20} /><Text style={styles.primaryButtonText}>{existing ? "알림 시점 변경" : "알림 예약"}</Text></>}</Pressable>{existing && <Pressable disabled={saving} onPress={onRemove} style={styles.removeButton}><Text style={styles.removeButtonText}>이 시험 알림 끄기</Text></Pressable>}</View></View>
+    </Modal>
+  );
+}
+
+function BottomTabs({ active, onChange }: { active: TabId; onChange: (tab: TabId) => void }) {
+  const insets = useSafeAreaInsets();
+  return <View style={[styles.bottomTabs, { paddingBottom: Math.max(insets.bottom, 8) }]}>{tabs.map((tab) => { const selected = active === tab.id; return <Pressable accessibilityRole="tab" accessibilityState={{ selected }} key={tab.id} onPress={() => onChange(tab.id)} style={styles.tabButton}><NativeIcon color={selected ? "#4058d8" : "#7a8195"} name={tab.icon} size={23} /><Text style={[styles.tabLabel, selected && styles.tabLabelActive]}>{tab.label}</Text>{selected && <View style={styles.tabIndicator} />}</Pressable>; })}</View>;
+}
+
+function MobileApp() {
+  const [activeTab, setActiveTab] = useState<TabId>("home");
+  const [findFilter, setFindFilter] = useState<HomeSummaryFilter>("all");
+  const [detailExamId, setDetailExamId] = useState<string>();
+  const [editorExamId, setEditorExamId] = useState<string>();
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+  const [checkedPreparationIds, setCheckedPreparationIds] = useState<string[]>([]);
+  const [preferences, setPreferences] = useState<StoredReminderPreference[]>([]);
+  const [scheduledIds, setScheduledIds] = useState<Record<string, string>>({});
+  const [notificationStatus, setNotificationStatus] = useState<Notifications.PermissionStatus | "unknown">("unknown");
+  const [savingReminder, setSavingReminder] = useState(false);
+
+  const refreshNotificationStatus = useCallback(async () => {
+    const permission = await Notifications.getPermissionsAsync();
+    setNotificationStatus(permission.status);
   }, []);
 
-  const selectExamById = useCallback(
-    (examId: string, source: "link" | "notification") => {
-      const exam = getExam(examId);
-      if (!exam) {
-        setNotice("이 링크의 시험을 오프라인 카탈로그에서 찾지 못했습니다.");
-        return;
-      }
-
-      selectExam(
-        exam,
-        source === "notification"
-          ? `${exam.name} 알림에서 관심 시험을 열었습니다.`
-          : `${exam.name} 딥링크를 열었습니다.`,
-      );
-    },
-    [selectExam],
-  );
+  const refreshScheduled = useCallback(async () => {
+    const scheduled = await getScheduledCertbomReminders();
+    setScheduledIds(Object.fromEntries(scheduled.map((item) => [item.examId, item.notificationId])));
+  }, []);
 
   useEffect(() => {
     configureNotificationPresentation();
-    let mounted = true;
-    void loadSelectedExamId().then((examId) => {
-      if (!mounted || selectionMade.current || !examId) return;
-      const exam = getExam(examId);
-      if (exam) {
-        setSelectedExam(exam);
-        setNotice(`${exam.name}을 기기에서 불러왔습니다.`);
-      }
-    });
-    void loadFavoriteExamIds().then((examIds) => {
-      if (!mounted) return;
-      setFavoriteExamIds(examIds.filter((examId) => Boolean(getExam(examId))));
-    });
     void (async () => {
-      try {
-        const [storedIntent, scheduled] = await Promise.all([
-          loadReminderExamIds(),
-          getScheduledCertbomReminders(),
-        ]);
-        const inferredIds = [...new Set(scheduled.map((reminder) => reminder.examId))];
-        const intendedIds = (storedIntent.initialized ? storedIntent.examIds : inferredIds)
-          .filter((examId) => Boolean(getExam(examId)));
+      const [storedFavorites, legacyIntent, storedPreferences, storedPreparationIds, scheduled] = await Promise.all([
+        loadFavoriteExamIds(),
+        loadReminderExamIds(),
+        loadReminderPreferences(),
+        loadPreparationCheckedIds(),
+        getScheduledCertbomReminders(),
+      ]);
+      const validFavorites = storedFavorites.filter((id) => Boolean(getExam(id)));
+      const storedById = new Map(storedPreferences.map((item) => [item.examId, item]));
+      for (const item of scheduled) if (!storedById.has(item.examId)) storedById.set(item.examId, { examId: item.examId, daysBefore: item.daysBefore });
+      for (const id of legacyIntent.examIds) if (!storedById.has(id)) storedById.set(id, { examId: id, daysBefore: 1 });
+      const validPreferences = [...storedById.values()].filter((item) => Boolean(getExam(item.examId)));
+      setFavoriteIds(validFavorites);
+      setPreferences(validPreferences);
+      setCheckedPreparationIds(storedPreparationIds);
+      await Promise.all([
+        saveFavoriteExamIds(validFavorites),
+        saveReminderExamIds(validPreferences.map((item) => item.examId)),
+        saveReminderPreferences(validPreferences),
+        savePreparationCheckedIds(storedPreparationIds),
+      ]);
+      const reconciled = await reconcileCertbomReminders(exams, validPreferences);
+      setScheduledIds(Object.fromEntries(reconciled.map((item) => [item.examId, item.notificationId])));
+      await refreshNotificationStatus();
+    })().catch(() => undefined);
+  }, [refreshNotificationStatus]);
 
-        if (!storedIntent.initialized || intendedIds.length !== storedIntent.examIds.length) {
-          await saveReminderExamIds(intendedIds);
-        }
-
-        const reminders = await reconcileCertbomReminders(exams, intendedIds);
-        if (!mounted) return;
-        setReminderExamIds(intendedIds);
-        setScheduledReminderIds(
-          Object.fromEntries(reminders.map((reminder) => [reminder.examId, reminder.notificationId])),
-        );
-      } catch {
-        // 알림 저장소 오류가 시험 탐색과 공식 링크 사용을 막지 않게 한다.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        void refreshNotificationStatus();
+        void refreshScheduled();
       }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const updateFavorites = useCallback((exam: Exam, removeReminder: boolean) => {
-    setFavoriteExamIds((current) => {
-      const isFavorite = current.includes(exam.id);
-      const next = isFavorite
-        ? current.filter((examId) => examId !== exam.id)
-        : [...current, exam.id];
-      void saveFavoriteExamIds(next).then(async (saved) => {
-        if (!saved) {
-          setNotice("관심 시험은 현재 화면에 유지되지만 기기 저장에는 실패했습니다.");
-          return;
-        }
-        if (isFavorite && removeReminder) {
-          const nextReminderIds = reminderExamIds.filter((examId) => examId !== exam.id);
-          const intentSaved = await saveReminderExamIds(nextReminderIds);
-          if (!intentSaved) {
-            setNotice("관심 시험은 해제했지만 알림 설정 저장에는 실패했습니다. 알림은 그대로 유지했어요.");
-            return;
-          }
-          await cancelCertbomRemindersForExam(exam.id);
-          setReminderExamIds(nextReminderIds);
-          setScheduledReminderIds((scheduled) => {
-            const nextScheduled = { ...scheduled };
-            delete nextScheduled[exam.id];
-            return nextScheduled;
-          });
-          setNotice(`${exam.name} 관심 시험과 예약 알림을 해제했어요.`);
-          return;
-        }
-        setNotice(isFavorite ? `${exam.name} 관심 시험을 해제했어요.` : `${exam.name}을 관심 시험에 저장했어요.`);
-      });
-      return next;
     });
-  }, [reminderExamIds]);
-
-  const toggleFavorite = useCallback((exam: Exam) => {
-    if (!favoriteExamIds.includes(exam.id)) {
-      updateFavorites(exam, false);
-      return;
-    }
-    Alert.alert(
-      "관심 시험에서 빼기",
-      "이미 예약한 알림도 함께 취소할까요?",
-      [
-        { text: "알림 유지", onPress: () => updateFavorites(exam, false) },
-        { text: "알림도 취소", style: "destructive", onPress: () => updateFavorites(exam, true) },
-        { text: "취소", style: "cancel" },
-      ],
-    );
-  }, [favoriteExamIds, updateFavorites]);
-
-  useEffect(() => {
-    const handleUrl = ({ url }: { url: string }) => {
-      const examId = parseExamDeepLink(url);
-      if (examId) selectExamById(examId, "link");
-    };
-
-    const subscription = Linking.addEventListener("url", handleUrl);
-    void Linking.getInitialURL()
-      .then((url) => {
-        if (url) handleUrl({ url });
-      })
-      .catch(() => undefined);
-
     return () => subscription.remove();
-  }, [selectExamById]);
+  }, [refreshNotificationStatus, refreshScheduled]);
 
-  useEffect(() => {
-    const handleResponse = (response: Notifications.NotificationResponse) => {
-      const examId = response.notification.request.content.data?.examId;
-      if (typeof examId === "string") selectExamById(examId, "notification");
-    };
-
-    const subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
-    void Notifications.getLastNotificationResponseAsync()
-      .then((response) => {
-        if (!response) return;
-        handleResponse(response);
-        return Notifications.clearLastNotificationResponseAsync();
-      })
-      .catch(() => undefined);
-
-    return () => subscription.remove();
-  }, [selectExamById]);
-
-  const filteredExams = useMemo(() => {
-    const keyword = normalize(query);
-    if (!keyword) return exams;
-
-    return exams.filter((exam) =>
-      normalize(
-        [exam.name, exam.shortName, exam.organizer, exam.category, ...exam.aliases]
-          .filter(Boolean)
-          .join(" "),
-      ).includes(keyword),
-    );
-  }, [query]);
-
-  const nextEvent = selectedExam ? getNextEvent(selectedExam) : undefined;
-  const selectedIsFavorite = selectedExam ? favoriteExamIds.includes(selectedExam.id) : false;
-  const selectedHasReminder = selectedExam ? Boolean(scheduledReminderIds[selectedExam.id]) : false;
-  const officialActions = selectedExam ? getOfficialExamActions(selectedExam) : [];
-
-  const openExternalUrl = useCallback(async (url: string, label: string) => {
-    try {
-      await Linking.openURL(url);
-      setNotice(`${label}을 기기 브라우저에서 열었습니다.`);
-    } catch {
-      setNotice(`${label}을 열지 못했습니다. 네트워크 상태나 브라우저 설정을 확인해 주세요.`);
-    }
+  const openExam = useCallback((exam: Exam) => {
+    setDetailExamId(exam.id);
+    void saveSelectedExamId(exam.id);
   }, []);
 
-  const scheduleReminder = useCallback(async () => {
-    if (!selectedExam || isScheduling) return;
+  useEffect(() => {
+    const selectFromUrl = (url: string) => {
+      const examId = parseExamDeepLink(url);
+      const exam = examId ? getExam(examId) : undefined;
+      if (exam) openExam(exam);
+    };
+    const urlSubscription = Linking.addEventListener("url", ({ url }) => selectFromUrl(url));
+    void Linking.getInitialURL().then((url) => { if (url) selectFromUrl(url); });
+    const notificationSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const examId = response.notification.request.content.data?.examId;
+      const exam = typeof examId === "string" ? getExam(examId) : undefined;
+      if (exam) openExam(exam);
+    });
+    void Notifications.getLastNotificationResponseAsync().then((response) => {
+      const examId = response?.notification.request.content.data?.examId;
+      const exam = typeof examId === "string" ? getExam(examId) : undefined;
+      if (exam) openExam(exam);
+      if (response) return Notifications.clearLastNotificationResponseAsync();
+    });
+    return () => { urlSubscription.remove(); notificationSubscription.remove(); };
+  }, [openExam]);
 
-    setIsScheduling(true);
-    const result = await scheduleExamReminder(selectedExam);
-    setIsScheduling(false);
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (editorExamId) { setEditorExamId(undefined); return true; }
+      if (detailExamId) { setDetailExamId(undefined); return true; }
+      if (activeTab !== "home") { setActiveTab("home"); return true; }
+      return false;
+    });
+    return () => subscription.remove();
+  }, [activeTab, detailExamId, editorExamId]);
 
+  const openUrl = useCallback(async (url: string, label: string) => {
+    try { await Linking.openURL(url); }
+    catch { Alert.alert("링크를 열지 못했어요", `${label}을 열 브라우저가 있는지 확인해 주세요.`); }
+  }, []);
+
+  const changeTab = (tab: TabId) => {
+    setDetailExamId(undefined);
+    setEditorExamId(undefined);
+    setActiveTab(tab);
+  };
+
+  const toggleFavorite = async (exam: Exam) => {
+    const removing = favoriteIds.includes(exam.id);
+    const next = removing ? favoriteIds.filter((id) => id !== exam.id) : [...favoriteIds, exam.id];
+    setFavoriteIds(next);
+    if (!(await saveFavoriteExamIds(next))) {
+      setFavoriteIds(favoriteIds);
+      Alert.alert("저장하지 못했어요", "기기 저장소를 확인한 뒤 다시 시도해 주세요.");
+    }
+  };
+
+  const togglePreparation = async (itemId: string) => {
+    const next = checkedPreparationIds.includes(itemId)
+      ? checkedPreparationIds.filter((id) => id !== itemId)
+      : [...checkedPreparationIds, itemId];
+    setCheckedPreparationIds(next);
+    if (!(await savePreparationCheckedIds(next))) {
+      setCheckedPreparationIds(checkedPreparationIds);
+      Alert.alert("체크를 저장하지 못했어요", "기기 저장소를 확인한 뒤 다시 시도해 주세요.");
+    }
+  };
+
+  const saveReminder = async (exam: Exam, daysBefore: ReminderDaysBefore) => {
+    setSavingReminder(true);
+    const result = await scheduleExamReminder(exam, daysBefore);
     if (!result.ok) {
-      setNotice(result.message);
+      setSavingReminder(false);
+      Alert.alert("알림을 예약하지 못했어요", result.message);
+      await refreshNotificationStatus();
       return;
     }
-
-    const nextReminderIds = [...new Set([...reminderExamIds, selectedExam.id])];
-    const intentSaved = await saveReminderExamIds(nextReminderIds);
-    if (!intentSaved) {
-      await cancelCertbomRemindersForExam(selectedExam.id);
-      setNotice("알림은 만들었지만 기기 설정에 저장하지 못해 안전하게 취소했습니다. 다시 시도해 주세요.");
+    const nextPreferences = [...preferences.filter((item) => item.examId !== exam.id), { examId: exam.id, daysBefore }];
+    const saved = await Promise.all([
+      saveReminderPreferences(nextPreferences),
+      saveReminderExamIds(nextPreferences.map((item) => item.examId)),
+    ]);
+    if (saved.some((value) => !value)) {
+      await cancelCertbomRemindersForExam(exam.id);
+      setSavingReminder(false);
+      Alert.alert("알림 설정을 저장하지 못했어요", "예약을 안전하게 취소했습니다. 다시 시도해 주세요.");
       return;
     }
-
-    setNotice(
-      `${result.plan.eventTitle} 알림을 ${formatReminderDate(result.plan.date)}에 예약했습니다.`,
-    );
-    setReminderExamIds(nextReminderIds);
-    setScheduledReminderIds((current) => ({ ...current, [selectedExam.id]: result.notificationId }));
-  }, [isScheduling, reminderExamIds, selectedExam]);
-
-  const cancelReminder = useCallback(async () => {
-    if (!selectedExam || isCancelling) return;
-    setIsCancelling(true);
-    try {
-      const nextReminderIds = reminderExamIds.filter((examId) => examId !== selectedExam.id);
-      const intentSaved = await saveReminderExamIds(nextReminderIds);
-      if (!intentSaved) {
-        setNotice("알림 설정을 기기에 저장하지 못해 기존 예약을 유지했습니다. 다시 시도해 주세요.");
-        return;
-      }
-      const cancelled = await cancelCertbomRemindersForExam(selectedExam.id);
-      setReminderExamIds(nextReminderIds);
-      setScheduledReminderIds((current) => {
-        const next = { ...current };
-        delete next[selectedExam.id];
-        return next;
-      });
-      setNotice(cancelled ? `${selectedExam.name} 예약 알림을 취소했어요.` : "취소할 예약 알림이 없어요.");
-    } catch {
-      setNotice("알림 취소 중 오류가 발생했어요. 다시 시도해 주세요.");
-    } finally {
-      setIsCancelling(false);
+    if (!favoriteIds.includes(exam.id)) {
+      const nextFavorites = [...favoriteIds, exam.id];
+      setFavoriteIds(nextFavorites);
+      await saveFavoriteExamIds(nextFavorites);
     }
-  }, [isCancelling, reminderExamIds, selectedExam]);
+    setPreferences(nextPreferences);
+    setScheduledIds((current) => ({ ...current, [exam.id]: result.notificationId }));
+    setSavingReminder(false);
+    setEditorExamId(undefined);
+    Alert.alert("알림을 예약했어요", `${result.plan.eventTitle}을 ${formatReminderDate(result.plan.date)}에 알려드릴게요.`);
+  };
 
-  const header = (
-    <View>
-      <View style={styles.hero}>
-        <Text style={styles.eyebrow}>ROBOM FAMILY</Text>
-        <Text style={styles.wordmark}>자격증봄</Text>
-        <Text style={styles.subtitle}>{catalogStats.examCount}개 시험을 오프라인에서 찾고, 관심 시험별로 알림을 받을 수 있어요.</Text>
-      </View>
+  const removeReminder = async (exam: Exam) => {
+    setSavingReminder(true);
+    const nextPreferences = preferences.filter((item) => item.examId !== exam.id);
+    await cancelCertbomRemindersForExam(exam.id);
+    await Promise.all([saveReminderPreferences(nextPreferences), saveReminderExamIds(nextPreferences.map((item) => item.examId))]);
+    setPreferences(nextPreferences);
+    setScheduledIds((current) => { const next = { ...current }; delete next[exam.id]; return next; });
+    setSavingReminder(false);
+    setEditorExamId(undefined);
+  };
 
-      <View style={styles.selectedCard}>
-        <Text style={styles.sectionLabel}>내 관심 시험</Text>
-        {selectedExam ? (
-          <>
-            <Text style={styles.selectedName}>{selectedExam.name}</Text>
-            <Text style={styles.meta}>
-              {selectedExam.organizer} · {selectedExam.category}
-            </Text>
-            <Text style={styles.eventText}>
-              {nextEvent
-                ? `${nextEvent.title} · ${formatEventDate(nextEvent.startAt)}`
-                : "확정 일정은 공식 시험 페이지에서 확인해 주세요."}
-            </Text>
-            <Text style={styles.detailHint}>준비물 {selectedExam.preparation.length}개 · 관심 시험 {favoriteExamIds.length}개</Text>
-            {selectedHasReminder ? <Text style={styles.reminderStatus}>이 시험의 로컬 알림이 예약되어 있어요.</Text> : null}
-            {selectedExam.preparation.length > 0 ? (
-              <Text style={styles.preparationHint}>
-                준비물 {formatPreparationPreview(selectedExam.preparation)}
-              </Text>
-            ) : null}
-            <View style={styles.actionGroup}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected: selectedIsFavorite }}
-                onPress={() => toggleFavorite(selectedExam)}
-                style={({ pressed }) => [styles.favoriteButton, selectedIsFavorite && styles.favoriteButtonActive, pressed && styles.pressed]}
-              >
-                <Text style={[styles.favoriteButtonText, selectedIsFavorite && styles.favoriteButtonTextActive]}>
-                  {selectedIsFavorite ? "관심 시험에서 빼기" : "관심 시험에 저장"}
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`${selectedExam.name} 로컬 알림 예약`}
-                disabled={isScheduling || selectedHasReminder}
-                onPress={scheduleReminder}
-                style={({ pressed }) => [
-                  styles.primaryButton,
-                  pressed && styles.pressed,
-                  (isScheduling || selectedHasReminder) && styles.disabled,
-                ]}
-              >
-                {isScheduling ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <Text style={styles.primaryButtonText}>{selectedHasReminder ? "알림 예약됨" : "로컬 알림 예약"}</Text>
-                )}
-              </Pressable>
-              {selectedHasReminder ? (
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={isCancelling}
-                  onPress={() => void cancelReminder()}
-                  style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed, isCancelling && styles.disabled]}
-                >
-                  <Text style={styles.cancelButtonText}>{isCancelling ? "취소 중" : "예약 알림 취소"}</Text>
-                </Pressable>
-              ) : null}
-              <Pressable
-                accessibilityRole="link"
-                onPress={() => void openExternalUrl(selectedExam.officialUrl, "공식 시험 페이지")}
-                style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-              >
-                <Text style={styles.secondaryButtonText}>공식 시험 페이지 열기 ↗</Text>
-              </Pressable>
-              {selectedExam.applicationUrl && selectedExam.applicationUrl !== selectedExam.officialUrl ? (
-                <Pressable
-                  accessibilityRole="link"
-                  onPress={() =>
-                    void openExternalUrl(selectedExam.applicationUrl ?? selectedExam.officialUrl, "공식 접수처")
-                  }
-                  style={({ pressed }) => [styles.tertiaryButton, pressed && styles.pressed]}
-                >
-                  <Text style={styles.tertiaryButtonText}>공식 접수처 열기 ↗</Text>
-                </Pressable>
-              ) : null}
-            </View>
-            {officialActions.length > 0 ? (
-              <View style={styles.officialActions}>
-                <Text style={styles.officialActionsTitle}>Q-Net 공식 도구</Text>
-                {officialActions.map((action) => (
-                  <Pressable
-                    accessibilityRole="link"
-                    key={action.id}
-                    onPress={() => void openExternalUrl(action.url, action.label)}
-                    style={({ pressed }) => [styles.officialAction, pressed && styles.pressed]}
-                  >
-                    <View style={styles.officialActionCopy}>
-                      <Text style={styles.officialActionLabel}>{action.label}</Text>
-                      <Text style={styles.officialActionDescription}>{action.description}</Text>
-                    </View>
-                    <Text
-                      accessibilityElementsHidden
-                      importantForAccessibility="no"
-                      style={styles.officialActionArrow}
-                    >
-                      ↗
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-          </>
-        ) : (
-          <Text style={styles.emptySelection}>아래 목록에서 시험 한 건을 선택해 주세요.</Text>
-        )}
-        <Text accessibilityLiveRegion="polite" style={styles.notice}>
-          {notice}
-        </Text>
-      </View>
+  const openNotificationSettings = async () => {
+    try { await Linking.openSettings(); }
+    catch { Alert.alert("설정을 열지 못했어요", "기기 설정에서 자격증봄의 알림을 확인해 주세요."); }
+  };
 
-      <View style={styles.searchBlock}>
-        <Text style={styles.sectionTitle}>시험 찾기</Text>
-        <Text style={styles.countText}>
-          오프라인 카탈로그 {catalogStats.examCount}개 · 검색 결과 {filteredExams.length}개
-        </Text>
-        <TextInput
-          accessibilityLabel="시험 검색"
-          autoCapitalize="none"
-          autoCorrect={false}
-          clearButtonMode="while-editing"
-          onChangeText={setQuery}
-          placeholder="시험명, 약칭, 기관 또는 분야 검색"
-          placeholderTextColor="#728078"
-          returnKeyType="search"
-          style={styles.searchInput}
-          value={query}
-        />
-      </View>
-    </View>
-  );
+  const openBatterySettings = async () => {
+    try { await IntentLauncher.startActivityAsync("android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS"); }
+    catch { Alert.alert("배터리 설정을 열지 못했어요", "기기 설정의 배터리 최적화 앱 목록에서 자격증봄을 확인해 주세요."); }
+  };
 
+  const detailExam = detailExamId ? getExam(detailExamId) : undefined;
+  const editorExam = editorExamId ? getExam(editorExamId) : undefined;
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={styles.safeArea}>
-      <FlatList
-        ref={listRef}
-        contentContainerStyle={styles.listContent}
-        data={filteredExams}
-        extraData={selectedExam?.id}
-        keyboardShouldPersistTaps="handled"
-        keyExtractor={(exam) => exam.id}
-        ListEmptyComponent={<Text style={styles.noResults}>검색 결과가 없습니다.</Text>}
-        ListFooterComponent={
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              자격증봄은 정부·시행기관을 대표하지 않는 독립 정보 도구입니다. 일정과 응시자격은 시행기관의 최신 공고를 기준으로 확인하세요.
-            </Text>
-            <View style={styles.footerLinks}>
-              <Pressable
-                accessibilityRole="link"
-                onPress={() => void openExternalUrl(SUPPORT_URL, "지원 페이지")}
-                style={styles.footerLinkButton}
-              >
-                <Text style={styles.footerLink}>지원</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="link"
-                onPress={() => void openExternalUrl(PRIVACY_URL, "개인정보 처리방침")}
-                style={styles.footerLinkButton}
-              >
-                <Text style={styles.footerLink}>개인정보</Text>
-              </Pressable>
-            </View>
-          </View>
-        }
-        ListHeaderComponent={header}
-        renderItem={({ item }) => {
-          const isSelected = selectedExam?.id === item.id;
-          return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: isSelected }}
-              onPress={() => selectExam(item, `${item.name} 시험 상세를 열었어요.`)}
-              style={({ pressed }) => [
-                styles.examRow,
-                isSelected && styles.examRowSelected,
-                pressed && styles.pressed,
-              ]}
-            >
-              <View style={styles.examCopy}>
-                <Text style={styles.examName}>{item.name}</Text>
-                <Text numberOfLines={1} style={styles.examMeta}>
-                  {item.organizer} · {item.category}
-                </Text>
-              </View>
-              <Text style={[styles.selectLabel, isSelected && styles.selectLabelSelected]}>
-                {isSelected ? "선택됨" : "선택"}
-              </Text>
-            </Pressable>
-          );
-        }}
-        showsVerticalScrollIndicator={false}
-      />
+      {detailExam ? <DetailScreen checkedPreparationIds={checkedPreparationIds} exam={detailExam} favorite={favoriteIds.includes(detailExam.id)} onBack={() => setDetailExamId(undefined)} onEditReminder={() => setEditorExamId(detailExam.id)} onOpenUrl={openUrl} onToggleFavorite={() => void toggleFavorite(detailExam)} onTogglePreparation={(itemId) => void togglePreparation(itemId)} reminder={preferences.find((item) => item.examId === detailExam.id)} /> : <><BrandHeader compact={activeTab !== "home"} onOpenRobom={() => void openUrl(ROBOM_URL, "로봄 홈페이지")} /><View style={styles.content}>{activeTab === "home" && <HomeScreen favoriteIds={favoriteIds} onFind={() => changeTab("find")} onOpen={openExam} onSelectFilter={(filter) => { setFindFilter(filter); changeTab("find"); }} onShowReminders={() => changeTab("reminders")} />}{activeTab === "find" && <FindScreen favoriteIds={favoriteIds} initialFilter={findFilter} onOpen={openExam} />}{activeTab === "calendar" && <CalendarScreen favoriteIds={favoriteIds} onOpen={openExam} />}{activeTab === "reminders" && <RemindersScreen favoriteIds={favoriteIds} notificationStatus={notificationStatus} onEdit={(exam) => setEditorExamId(exam.id)} onOpen={openExam} onOpenNotificationSettings={() => void openNotificationSettings()} preferences={preferences} scheduledIds={scheduledIds} />}{activeTab === "settings" && <SettingsScreen notificationStatus={notificationStatus} onOpenBatterySettings={() => void openBatterySettings()} onOpenNotificationSettings={() => void openNotificationSettings()} onOpenUrl={openUrl} />}</View><BottomTabs active={activeTab} onChange={changeTab} /></>}
+      {editorExam && <ReminderEditor exam={editorExam} existing={preferences.find((item) => item.examId === editorExam.id)} onCancel={() => setEditorExamId(undefined)} onRemove={() => void removeReminder(editorExam)} onSave={(days) => void saveReminder(editorExam, days)} saving={savingReminder} />}
     </SafeAreaView>
   );
 }
 
 export default function App() {
-  return (
-    <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <MobileApp />
-    </SafeAreaProvider>
-  );
+  return <SafeAreaProvider><StatusBar style="dark" /><MobileApp /></SafeAreaProvider>;
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#f4f8f5",
-  },
-  listContent: {
-    width: "100%",
-    maxWidth: 900,
-    alignSelf: "center",
-    paddingHorizontal: 18,
-    paddingBottom: 40,
-  },
-  hero: {
-    paddingTop: 20,
-    paddingBottom: 20,
-  },
-  eyebrow: {
-    color: "#18794e",
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 1.2,
-  },
-  wordmark: {
-    marginTop: 5,
-    color: "#10271c",
-    fontSize: 34,
-    fontWeight: "900",
-    letterSpacing: -1.4,
-  },
-  subtitle: {
-    marginTop: 8,
-    color: "#526259",
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  selectedCard: {
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "#cfe0d5",
-    borderRadius: 20,
-    backgroundColor: "#ffffff",
-  },
-  sectionLabel: {
-    color: "#18794e",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  selectedName: {
-    marginTop: 8,
-    color: "#10271c",
-    fontSize: 24,
-    fontWeight: "800",
-    letterSpacing: -0.7,
-  },
-  meta: {
-    marginTop: 5,
-    color: "#5b6a61",
-    fontSize: 14,
-  },
-  eventText: {
-    marginTop: 12,
-    color: "#2c4436",
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  detailHint: {
-    marginTop: 8,
-    color: "#365b45",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  reminderStatus: {
-    marginTop: 8,
-    color: "#14633f",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  preparationHint: {
-    marginTop: 6,
-    color: "#526259",
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  actionGroup: {
-    marginTop: 16,
-    gap: 9,
-  },
-  officialActions: {
-    marginTop: 18,
-    gap: 8,
-  },
-  officialActionsTitle: {
-    color: "#365b45",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  officialAction: {
-    minHeight: 60,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
-    borderColor: "#d7e1da",
-    borderRadius: 14,
-    backgroundColor: "#f8fbf9",
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-  },
-  officialActionCopy: {
-    flex: 1,
-  },
-  officialActionLabel: {
-    color: "#14633f",
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  officialActionDescription: {
-    marginTop: 3,
-    color: "#5b6a61",
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  officialActionArrow: {
-    color: "#18794e",
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  favoriteButton: {
-    minHeight: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#18794e",
-    borderRadius: 14,
-    backgroundColor: "#ffffff",
-    paddingHorizontal: 16,
-  },
-  favoriteButtonActive: {
-    backgroundColor: "#e7f4eb",
-  },
-  favoriteButtonText: {
-    color: "#14633f",
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  favoriteButtonTextActive: {
-    color: "#0f5132",
-  },
-  primaryButton: {
-    minHeight: 52,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 14,
-    backgroundColor: "#18794e",
-    paddingHorizontal: 16,
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  cancelButton: {
-    minHeight: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#a33d35",
-    borderRadius: 14,
-    backgroundColor: "#ffffff",
-    paddingHorizontal: 16,
-  },
-  cancelButtonText: {
-    color: "#8a3029",
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  secondaryButton: {
-    minHeight: 52,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#18794e",
-    borderRadius: 14,
-    backgroundColor: "#ffffff",
-    paddingHorizontal: 16,
-  },
-  secondaryButtonText: {
-    color: "#14633f",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  tertiaryButton: {
-    minHeight: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 12,
-  },
-  tertiaryButtonText: {
-    color: "#365b45",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  emptySelection: {
-    marginTop: 8,
-    color: "#526259",
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  notice: {
-    marginTop: 14,
-    borderRadius: 12,
-    backgroundColor: "#edf5f0",
-    color: "#365b45",
-    fontSize: 13,
-    lineHeight: 19,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  searchBlock: {
-    paddingTop: 28,
-    paddingBottom: 12,
-  },
-  sectionTitle: {
-    color: "#10271c",
-    fontSize: 22,
-    fontWeight: "800",
-  },
-  countText: {
-    marginTop: 5,
-    color: "#637168",
-    fontSize: 13,
-  },
-  searchInput: {
-    minHeight: 52,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: "#bdcec3",
-    borderRadius: 14,
-    backgroundColor: "#ffffff",
-    color: "#10271c",
-    fontSize: 16,
-    paddingHorizontal: 15,
-  },
-  examRow: {
-    minHeight: 70,
-    marginBottom: 9,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
-    borderColor: "#d7e1da",
-    borderRadius: 16,
-    backgroundColor: "#ffffff",
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-  },
-  examRowSelected: {
-    borderColor: "#18794e",
-    backgroundColor: "#edf7f1",
-  },
-  examCopy: {
-    flex: 1,
-  },
-  examName: {
-    color: "#172d21",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  examMeta: {
-    marginTop: 5,
-    color: "#66736b",
-    fontSize: 13,
-  },
-  selectLabel: {
-    minWidth: 44,
-    color: "#5e6b63",
-    fontSize: 13,
-    fontWeight: "700",
-    textAlign: "right",
-  },
-  selectLabelSelected: {
-    color: "#18794e",
-  },
-  noResults: {
-    paddingVertical: 30,
-    color: "#637168",
-    fontSize: 15,
-    textAlign: "center",
-  },
-  footer: {
-    alignItems: "center",
-    paddingTop: 24,
-    paddingBottom: 20,
-  },
-  footerText: {
-    color: "#637168",
-    fontSize: 13,
-    lineHeight: 19,
-    textAlign: "center",
-  },
-  footerLinks: {
-    marginTop: 10,
-    flexDirection: "row",
-    gap: 6,
-  },
-  footerLinkButton: {
-    minHeight: 48,
-    justifyContent: "center",
-    paddingHorizontal: 14,
-  },
-  footerLink: {
-    color: "#365b45",
-    fontSize: 14,
-    fontWeight: "700",
-    textDecorationLine: "underline",
-  },
-  pressed: {
-    opacity: 0.72,
-  },
-  disabled: {
-    opacity: 0.55,
-  },
+  flex: { flex: 1 }, safeArea: { flex: 1, backgroundColor: "#f6f7fb" }, content: { flex: 1 }, pressed: { opacity: 0.72 }, disabled: { opacity: 0.45 },
+  brandHeader: { minHeight: 86, flexDirection: "row", alignItems: "center", gap: 11, borderBottomWidth: 1, borderBottomColor: "#e6e8f1", backgroundColor: "#fffefb", paddingHorizontal: 16, paddingVertical: 10 }, brandHeaderCompact: { minHeight: 70, paddingVertical: 7 }, brandIcon: { width: 42, height: 42, alignItems: "center", justifyContent: "center", borderRadius: 13, backgroundColor: "#4058d8" }, brandIconText: { color: "#ffffff", fontSize: 25, fontWeight: "900" }, brandCopy: { flex: 1 }, brandEyebrow: { color: "#7b8090", fontSize: 11, fontWeight: "700" }, wordmarkRow: { minHeight: 34, flexDirection: "row", alignItems: "center" }, wordmarkText: { color: "#1d3047", fontSize: 25, fontWeight: "900", letterSpacing: -1.3 }, robomLink: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 3, borderRadius: 12, backgroundColor: "#eef0ff", paddingHorizontal: 10 }, robomLinkText: { color: "#4058d8", fontSize: 13, fontWeight: "800" },
+  screenContent: { width: "100%", maxWidth: 760, alignSelf: "center", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 116 },
+  heroCard: { borderRadius: 28, backgroundColor: "#eff1ff", padding: 22, overflow: "hidden" }, heroKicker: { color: "#5264c9", fontSize: 12, fontWeight: "800" }, heroTitle: { marginTop: 12, color: "#152039", fontSize: 32, lineHeight: 40, fontWeight: "900", letterSpacing: -1.5 }, heroHighlight: { color: "#4058d8" }, heroDescription: { marginTop: 12, color: "#59627a", fontSize: 15, lineHeight: 22 }, primaryButton: { minHeight: 54, marginTop: 18, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 16, backgroundColor: "#4058d8", paddingHorizontal: 18 }, primaryButtonText: { color: "#ffffff", fontSize: 16, fontWeight: "800" },
+  statGrid: { marginTop: 12, flexDirection: "row", gap: 8 }, statCard: { flex: 1, minHeight: 82, justifyContent: "space-between", borderWidth: 1, borderColor: "#e1e4ef", borderRadius: 18, backgroundColor: "#ffffff", padding: 12 }, statLabel: { color: "#70778b", fontSize: 12, fontWeight: "700" }, statValue: { color: "#1d2944", fontSize: 24, fontWeight: "900" }, statUnit: { fontSize: 13, fontWeight: "700" },
+  reminderSummary: { minHeight: 76, marginTop: 12, flexDirection: "row", alignItems: "center", gap: 11, borderWidth: 1, borderColor: "#dfe2f0", borderRadius: 20, backgroundColor: "#ffffff", paddingHorizontal: 14 }, reminderSummaryIcon: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 14, backgroundColor: "#eef0ff" }, reminderSummaryCopy: { flex: 1 }, reminderSummaryTitle: { color: "#222d47", fontSize: 15, fontWeight: "800" }, reminderSummaryText: { marginTop: 3, color: "#747b8e", fontSize: 12, lineHeight: 17 }, chevron: { color: "#8c92a2", fontSize: 28, fontWeight: "300" },
+  sectionTitleRow: { marginTop: 28, marginBottom: 12, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" }, sectionEyebrow: { color: "#6573c7", fontSize: 12, fontWeight: "800" }, sectionTitle: { marginTop: 3, color: "#1b2741", fontSize: 22, fontWeight: "900", letterSpacing: -0.7 }, sectionCount: { color: "#7c8395", fontSize: 13, fontWeight: "700" },
+  examRow: { minHeight: 90, marginBottom: 9, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderColor: "#e1e4ed", borderRadius: 19, backgroundColor: "#ffffff", paddingHorizontal: 15, paddingVertical: 13 }, examRowCopy: { flex: 1 }, examNameRow: { flexDirection: "row", alignItems: "center", gap: 7 }, examName: { flexShrink: 1, color: "#1d2942", fontSize: 16, fontWeight: "800" }, favoriteBadge: { color: "#4058d8", fontSize: 10, fontWeight: "900", borderRadius: 8, backgroundColor: "#eef0ff", paddingHorizontal: 6, paddingVertical: 3, overflow: "hidden" }, examMeta: { marginTop: 4, color: "#737a8b", fontSize: 12 }, examNext: { marginTop: 7, color: "#4e5fbd", fontSize: 13, fontWeight: "700" },
+  emptyCard: { borderWidth: 1, borderColor: "#e1e4ed", borderRadius: 19, backgroundColor: "#ffffff", padding: 20 }, emptyTitle: { color: "#26314a", fontSize: 16, fontWeight: "800" }, emptyText: { marginTop: 6, color: "#747b8d", fontSize: 13, lineHeight: 19 },
+  timelineRow: { minHeight: 78, marginBottom: 9, flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "#e1e4ed", borderRadius: 18, backgroundColor: "#ffffff", overflow: "hidden", paddingRight: 12 }, timelineAccent: { width: 5, alignSelf: "stretch" }, timelineDate: { width: 54, alignItems: "center" }, timelineDay: { color: "#202c45", fontSize: 21, fontWeight: "900" }, timelineMonth: { color: "#8a90a0", fontSize: 11 }, timelineCopy: { flex: 1 }, timelineLabel: { color: "#6674ca", fontSize: 11, fontWeight: "800" }, timelineTitle: { marginTop: 2, color: "#253149", fontSize: 15, fontWeight: "800" }, timelineMeta: { marginTop: 3, color: "#73798a", fontSize: 12 },
+  pageTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, pageEyebrow: { color: "#6573c7", fontSize: 12, fontWeight: "800" }, pageTitle: { marginTop: 3, color: "#1b2741", fontSize: 28, fontWeight: "900", letterSpacing: -1 },
+  findHeader: { width: "100%", maxWidth: 760, alignSelf: "center", paddingHorizontal: 16, paddingTop: 16 }, searchBox: { minHeight: 54, marginTop: 15, flexDirection: "row", alignItems: "center", gap: 9, borderWidth: 1, borderColor: "#dfe2ec", borderRadius: 17, backgroundColor: "#ffffff", paddingHorizontal: 14 }, searchInput: { flex: 1, color: "#1d2942", fontSize: 15, paddingVertical: 0 }, filterRow: { marginTop: 12, flexDirection: "row", gap: 8 }, filterChip: { minHeight: 42, justifyContent: "center", borderWidth: 1, borderColor: "#dfe2ec", borderRadius: 14, backgroundColor: "#ffffff", paddingHorizontal: 15 }, filterChipActive: { borderColor: "#4058d8", backgroundColor: "#eef0ff" }, filterChipText: { color: "#666e82", fontSize: 13, fontWeight: "800" }, filterChipTextActive: { color: "#4058d8" }, resultCount: { marginTop: 14, color: "#767d8f", fontSize: 13, fontWeight: "700" }, findList: { width: "100%", maxWidth: 760, alignSelf: "center", paddingHorizontal: 16, paddingTop: 10, paddingBottom: 110 },
+  scopeButton: { minHeight: 42, justifyContent: "center", borderWidth: 1, borderColor: "#dfe2ec", borderRadius: 14, backgroundColor: "#ffffff", paddingHorizontal: 15 }, scopeButtonActive: { borderColor: "#4058d8", backgroundColor: "#eef0ff" }, scopeButtonText: { color: "#687085", fontSize: 13, fontWeight: "800" }, scopeButtonTextActive: { color: "#4058d8" }, calendarCard: { marginTop: 17, borderWidth: 1, borderColor: "#e1e4ed", borderRadius: 24, backgroundColor: "#ffffff", padding: 13 }, monthHeader: { minHeight: 48, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, monthButton: { width: 46, height: 46, alignItems: "center", justifyContent: "center", borderRadius: 14, backgroundColor: "#f4f5fa" }, monthTitle: { color: "#202c45", fontSize: 18, fontWeight: "900" }, weekRow: { marginTop: 5, flexDirection: "row" }, weekDay: { width: "14.2857%", color: "#8a90a0", fontSize: 11, fontWeight: "700", textAlign: "center" }, calendarGrid: { marginTop: 5, flexDirection: "row", flexWrap: "wrap" }, dayCell: { width: "14.2857%", minHeight: 47, alignItems: "center", justifyContent: "center", borderRadius: 13 }, dayCellSelected: { backgroundColor: "#4058d8" }, dayCellToday: { borderWidth: 1, borderColor: "#9ca8ef" }, dayNumber: { color: "#3a4358", fontSize: 14, fontWeight: "700" }, dayNumberSelected: { color: "#ffffff" }, eventDot: { width: 5, height: 5, marginTop: 3, borderRadius: 3, backgroundColor: "#4058d8" }, eventDotSelected: { backgroundColor: "#dfe3ff" }, agendaCard: { minHeight: 82, marginBottom: 9, flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderColor: "#e1e4ed", borderRadius: 18, backgroundColor: "#ffffff", padding: 13 }, agendaType: { minWidth: 58, height: 32, alignItems: "center", justifyContent: "center", borderRadius: 10 }, agendaTypeText: { color: "#ffffff", fontSize: 11, fontWeight: "900" }, agendaCopy: { flex: 1 }, agendaTitle: { color: "#243049", fontSize: 15, fontWeight: "800" }, agendaMeta: { marginTop: 3, color: "#5f687d", fontSize: 13 }, agendaSource: { marginTop: 4, color: "#8a90a0", fontSize: 11 },
+  notificationStatus: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 12, backgroundColor: "#ffffff", paddingHorizontal: 10, paddingVertical: 8 }, statusDot: { width: 8, height: 8, borderRadius: 4 }, statusGood: { backgroundColor: "#20a56b" }, statusWarn: { backgroundColor: "#e69632" }, notificationStatusText: { color: "#596176", fontSize: 12, fontWeight: "800" }, infoCard: { marginTop: 17, flexDirection: "row", alignItems: "flex-start", gap: 11, borderRadius: 19, backgroundColor: "#eef0ff", padding: 16 }, infoCopy: { flex: 1 }, infoTitle: { color: "#27345a", fontSize: 15, fontWeight: "800" }, infoText: { marginTop: 5, color: "#626b86", fontSize: 13, lineHeight: 19 }, outlineButton: { minHeight: 52, marginTop: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderWidth: 1, borderColor: "#4058d8", borderRadius: 15, backgroundColor: "#ffffff", paddingHorizontal: 15 }, outlineButtonActive: { backgroundColor: "#eef0ff" }, outlineButtonText: { color: "#4058d8", fontSize: 15, fontWeight: "800" }, outlineButtonTextActive: { color: "#3045bd" }, reminderCard: { minHeight: 86, marginBottom: 9, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderColor: "#e1e4ed", borderRadius: 18, backgroundColor: "#ffffff", padding: 12 }, reminderCardCopy: { flex: 1 }, reminderExamName: { color: "#233049", fontSize: 15, fontWeight: "800" }, reminderExamMeta: { marginTop: 5, color: "#777e90", fontSize: 11 }, reminderChip: { borderRadius: 10, backgroundColor: "#f0f1f5", paddingHorizontal: 8, paddingVertical: 6 }, reminderChipActive: { backgroundColor: "#e8ecff" }, reminderChipText: { color: "#777e8e", fontSize: 11, fontWeight: "800" }, reminderChipTextActive: { color: "#4058d8" }, editButton: { minWidth: 48, minHeight: 44, alignItems: "center", justifyContent: "center", borderRadius: 13, backgroundColor: "#4058d8" }, editButtonText: { color: "#ffffff", fontSize: 13, fontWeight: "800" },
+  settingsCard: { marginTop: 14, borderWidth: 1, borderColor: "#e1e4ed", borderRadius: 21, backgroundColor: "#ffffff", padding: 16 }, settingsTitle: { color: "#202c45", fontSize: 18, fontWeight: "900" }, settingsText: { marginTop: 7, color: "#6d7486", fontSize: 13, lineHeight: 20 }, settingsActionList: { marginTop: 10 }, settingsAction: { minHeight: 58, marginTop: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, borderRadius: 15, backgroundColor: "#f7f8fc", paddingHorizontal: 13, paddingVertical: 10 }, settingsActionTitle: { color: "#2a354d", fontSize: 14, fontWeight: "800" }, settingsActionMeta: { marginTop: 3, color: "#7d8495", fontSize: 11 }, familyRow: { minHeight: 65, marginTop: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderRadius: 15, backgroundColor: "#f7f8fc", paddingHorizontal: 13 }, familyName: { color: "#28344d", fontSize: 15, fontWeight: "900" }, familyDescription: { marginTop: 3, color: "#7c8394", fontSize: 11 }, metaRow: { minHeight: 42, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: "#edf0f5" }, metaLabel: { color: "#71788a", fontSize: 12 }, metaValue: { maxWidth: "65%", color: "#2b364e", fontSize: 12, fontWeight: "700", textAlign: "right" }, officialNotice: { marginTop: 13, color: "#71788a", fontSize: 11, lineHeight: 17 },
+  detailHeader: { minHeight: 62, flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: "#e5e8f0", backgroundColor: "#fffefb", paddingHorizontal: 10 }, backButton: { width: 48, height: 48, alignItems: "center", justifyContent: "center" }, detailHeaderTitle: { flex: 1, color: "#263149", fontSize: 16, fontWeight: "800", textAlign: "center" }, detailContent: { width: "100%", maxWidth: 760, alignSelf: "center", padding: 16, paddingBottom: 60 }, detailHero: { borderRadius: 24, backgroundColor: "#eef0ff", padding: 20 }, detailCategory: { color: "#5d6bc5", fontSize: 12, fontWeight: "800" }, detailTitle: { marginTop: 7, color: "#18233c", fontSize: 27, fontWeight: "900", letterSpacing: -1 }, detailDescription: { marginTop: 10, color: "#59627a", fontSize: 14, lineHeight: 21 }, detailBadgeRow: { marginTop: 13, flexDirection: "row", flexWrap: "wrap", gap: 7 }, detailBadge: { color: "#4058d8", fontSize: 11, fontWeight: "800", borderRadius: 10, backgroundColor: "#ffffff", paddingHorizontal: 8, paddingVertical: 5, overflow: "hidden" }, nextEventCard: { marginTop: 12, borderWidth: 1, borderColor: "#e1e4ed", borderRadius: 19, backgroundColor: "#ffffff", padding: 16 }, nextEventLabel: { color: "#6573c7", fontSize: 11, fontWeight: "800" }, nextEventTitle: { marginTop: 5, color: "#202c45", fontSize: 17, fontWeight: "900" }, nextEventDate: { marginTop: 5, color: "#6f7689", fontSize: 13 }, detailActions: { marginTop: 2 }, detailEventRow: { minHeight: 74, marginBottom: 8, flexDirection: "row", alignItems: "flex-start", gap: 11, borderRadius: 17, backgroundColor: "#ffffff", padding: 14 }, detailEventDot: { width: 10, height: 10, marginTop: 5, borderRadius: 5 }, detailEventCopy: { flex: 1 }, detailEventType: { color: "#6674ca", fontSize: 11, fontWeight: "800" }, detailEventTitle: { marginTop: 3, color: "#28344d", fontSize: 14, fontWeight: "800" }, detailEventDate: { marginTop: 4, color: "#7d8494", fontSize: 12 }, preparationProgress: { marginBottom: 11, borderRadius: 18, backgroundColor: "#eef0ff", padding: 14 }, preparationProgressCopy: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, preparationProgressTitle: { color: "#26345e", fontSize: 15, fontWeight: "900" }, preparationProgressMeta: { color: "#6573c7", fontSize: 12, fontWeight: "800" }, preparationProgressTrack: { height: 8, marginTop: 10, overflow: "hidden", borderRadius: 4, backgroundColor: "#d6dcfa" }, preparationProgressValue: { height: 8, borderRadius: 4, backgroundColor: "#4058d8" }, preparationRow: { minHeight: 72, marginBottom: 9, flexDirection: "row", alignItems: "flex-start", gap: 11, borderWidth: 1, borderColor: "#e1e4ed", borderRadius: 18, backgroundColor: "#ffffff", padding: 14 }, preparationRowChecked: { borderColor: "#b9c3f4", backgroundColor: "#f6f7ff" }, preparationCheckbox: { width: 26, height: 26, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#b4bac8", borderRadius: 8, backgroundColor: "#ffffff" }, preparationCheckboxChecked: { borderColor: "#4058d8", backgroundColor: "#4058d8" }, preparationCheckText: { color: "#ffffff", fontSize: 15, fontWeight: "900" }, preparationMark: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#8b93a6" }, preparationMarkRequired: { backgroundColor: "#4058d8" }, preparationMarkForbidden: { backgroundColor: "#d65c53" }, preparationCopy: { flex: 1 }, preparationTitleRow: { flexDirection: "row", alignItems: "center", gap: 7 }, preparationTitle: { flexShrink: 1, color: "#28344d", fontSize: 14, fontWeight: "800" }, preparationTitleChecked: { color: "#69738d", textDecorationLine: "line-through" }, preparationText: { marginTop: 5, color: "#697084", fontSize: 12, lineHeight: 18 }, preparationSource: { marginTop: 7, color: "#7d87c1", fontSize: 10, fontWeight: "700" },
+  modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(20,26,43,.36)" }, modalSheet: { maxHeight: "92%", borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: "#f8f9fc", paddingHorizontal: 18, paddingBottom: 26 }, modalHandle: { width: 42, height: 5, alignSelf: "center", marginTop: 9, marginBottom: 10, borderRadius: 3, backgroundColor: "#c9cdd8" }, modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, modalTitle: { marginTop: 3, color: "#1f2a43", fontSize: 23, fontWeight: "900" }, closeButton: { minWidth: 50, minHeight: 44, alignItems: "center", justifyContent: "center" }, closeButtonText: { color: "#4058d8", fontSize: 14, fontWeight: "800" }, modalEvent: { marginTop: 16, borderRadius: 18, backgroundColor: "#ffffff", padding: 15 }, optionTitle: { marginTop: 22, marginBottom: 10, color: "#27324a", fontSize: 16, fontWeight: "900" }, reminderOptions: { gap: 8 }, reminderOption: { minHeight: 64, justifyContent: "center", borderWidth: 1, borderColor: "#dfe2ec", borderRadius: 17, backgroundColor: "#ffffff", paddingHorizontal: 15 }, reminderOptionActive: { borderColor: "#4058d8", backgroundColor: "#eef0ff" }, reminderOptionValue: { color: "#303b52", fontSize: 15, fontWeight: "900" }, reminderOptionValueActive: { color: "#4058d8" }, reminderOptionHint: { marginTop: 3, color: "#858b9b", fontSize: 11 }, reminderOptionHintActive: { color: "#6876c8" }, modalNotice: { marginTop: 13, color: "#72798b", fontSize: 11, lineHeight: 17 }, removeButton: { minHeight: 50, marginTop: 8, alignItems: "center", justifyContent: "center" }, removeButtonText: { color: "#ad4e47", fontSize: 14, fontWeight: "800" },
+  bottomTabs: { minHeight: 68, flexDirection: "row", borderTopWidth: 1, borderTopColor: "#dfe2eb", backgroundColor: "#fffefb", paddingTop: 5 }, tabButton: { flex: 1, minHeight: 54, alignItems: "center", justifyContent: "center", gap: 2 }, tabLabel: { color: "#7a8195", fontSize: 10, fontWeight: "700" }, tabLabelActive: { color: "#4058d8", fontWeight: "900" }, tabIndicator: { position: "absolute", top: -5, width: 26, height: 3, borderRadius: 2, backgroundColor: "#4058d8" },
 });
