@@ -41,7 +41,7 @@
         "expo-notifications",
         {
           "color": "#18794e",
-          "defaultChannel": "certbom-reminders"
+          "defaultChannel": "certbom-reminders-v2"
         }
       ],
       [

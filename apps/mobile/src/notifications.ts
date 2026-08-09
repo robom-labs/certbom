@@ -9,7 +9,8 @@ import {
   type ReminderScope,
 } from "./reminder";
 
-const REMINDER_CHANNEL_ID = "certbom-reminders";
+const REMINDER_CHANNEL_ID = "certbom-reminders-v2";
+const REMINDER_CHANNEL_VERSION = 2;
 
 export type ReminderScheduleResult =
   | {
@@ -24,6 +25,7 @@ export type ReminderScheduleResult =
     };
 
 export type ScheduledExamReminder = {
+  channelVersion: number;
   daysBefore: ReminderDaysBefore;
   examId: string;
   dedupeKey: string;
@@ -65,7 +67,8 @@ export async function getScheduledCertbomReminders(): Promise<ScheduledExamRemin
       ? Number(rawDaysBefore) as ReminderDaysBefore
       : 1;
     const scope = notification.content.data?.scope === "critical" ? "critical" : "next";
-    return [{ examId, daysBefore, dedupeKey, notificationId: notification.identifier, scope }];
+    const channelVersion = Number(notification.content.data?.channelVersion ?? 1);
+    return [{ channelVersion, examId, daysBefore, dedupeKey, notificationId: notification.identifier, scope }];
   });
 }
 
@@ -75,7 +78,6 @@ async function ensureReminderChannel() {
     name: "관심 시험 알림",
     description: "사용자가 직접 저장한 시험의 공식 접수·시험·발표 일정을 알려줍니다.",
     importance: Notifications.AndroidImportance.HIGH,
-    sound: "default",
     vibrationPattern: [0, 250, 250, 250],
   });
 }
@@ -98,6 +100,7 @@ async function schedulePlan(exam: Exam, plan: ReminderPlan, scope: ReminderScope
         examId: exam.id,
         officialUrl: exam.officialUrl,
         daysBefore: plan.daysBefore,
+        channelVersion: REMINDER_CHANNEL_VERSION,
         scope,
         dedupeKey: reminderDedupeKey(exam.id, plan, scope),
       },
@@ -172,7 +175,7 @@ export async function reconcileCertbomReminders(
     const expected = exam && preference
       ? new Set(createExamReminderPlans(exam, preference.daysBefore, preference.scope).map((plan) => reminderDedupeKey(exam.id, plan, preference.scope)))
       : new Set<string>();
-    if (!expected.has(reminder.dedupeKey) || keep.has(reminder.dedupeKey)) {
+    if (reminder.channelVersion !== REMINDER_CHANNEL_VERSION || !expected.has(reminder.dedupeKey) || keep.has(reminder.dedupeKey)) {
       await Notifications.cancelScheduledNotificationAsync(reminder.notificationId);
       return;
     }
