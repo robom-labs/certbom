@@ -28,6 +28,13 @@ assert(expo.ios.bundleIdentifier === "kr.robom.certbom", "iOS bundle ID가 일�
 assert(expo.icon === "./assets/icon.png", "스토어용 앱 아이콘 경로가 필요합니다.");
 assert(expo.owner === "robom-labs", "EAS owner는 robom-labs여야 합니다.");
 assert(!(expo.android.permissions ?? []).includes("com.google.android.gms.permission.AD_ID"), "AD_ID 권한을 선언하면 안 됩니다.");
+for (const permission of [
+  "android.permission.SYSTEM_ALERT_WINDOW",
+  "android.permission.READ_EXTERNAL_STORAGE",
+  "android.permission.WRITE_EXTERNAL_STORAGE",
+]) {
+  assert(expo.android.blockedPermissions?.includes(permission), `${permission} 권한은 최종 앱에서 차단해야 합니다.`);
+}
 assert(!expo.ios.associatedDomains?.includes("applinks:robom.kr"), "실제 Apple Team ID 검증 전에는 Universal Link 도메인을 선언하면 안 됩니다.");
 assert(!expo.android.intentFilters.some((filter) => filter.autoVerify === true), "실제 Play 앱 서명 검증 전에는 Android App Link autoVerify를 선언하면 안 됩니다.");
 const buildProperties = expo.plugins.find((plugin) => Array.isArray(plugin) && plugin[0] === "expo-build-properties");

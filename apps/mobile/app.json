@@ -20,9 +20,14 @@
     },
     "android": {
       "package": "kr.robom.certbom",
-      "versionCode": 13,
+      "versionCode": 14,
       "permissions": [
         "android.permission.POST_NOTIFICATIONS"
+      ],
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
       "predictiveBackGestureEnabled": true,
       "adaptiveIcon": {
