@@ -12,7 +12,8 @@ test("앱 시작 때 사용자별 알림 시점으로 예약을 재조정하고 
   assert.match(appSource, /loadReminderPreferences/);
   assert.match(appSource, /saveReminderExamIds/);
   assert.match(appSource, /saveReminderPreferences/);
-  assert.match(appSource, /setScheduledIds/);
+  assert.match(appSource, /setScheduledCounts/);
+  assert.match(appSource, /scope: "next"/);
   assert.match(notificationSource, /getAllScheduledNotificationsAsync/);
   assert.match(notificationSource, /cancelScheduledNotificationAsync/);
 });
@@ -24,4 +25,5 @@ test("관심 시험·개별 알림·준비 체크를 서로 분리해 저장한�
   assert.match(appSource, /cancelCertbomRemindersForExam/);
   assert.match(appSource, /\(\[7, 3, 1\] as const\)/);
   assert.match(appSource, /Google 캘린더에 추가/);
+  assert.match(appSource, /중요 일정 전체/);
 });

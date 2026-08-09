@@ -1,16 +1,21 @@
-// 사용자 요청 뒤 권한을 확인하고 관심 시험의 로컬 알림을 예약한다.
-import { getNextEvent, type Exam } from "@certbom/core";
+// 사용자 요청 뒤 권한을 확인하고 관심 시험의 중요 공식 일정 알림을 예약한다.
+import type { Exam } from "@certbom/core";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
-import { createReminderPlan, type ReminderDaysBefore } from "./reminder";
+import {
+  createExamReminderPlans,
+  type ReminderDaysBefore,
+  type ReminderPlan,
+  type ReminderScope,
+} from "./reminder";
 
 const REMINDER_CHANNEL_ID = "certbom-reminders";
 
 export type ReminderScheduleResult =
   | {
       ok: true;
-      notificationId: string;
-      plan: NonNullable<ReturnType<typeof createReminderPlan>>;
+      notificationIds: string[];
+      plans: ReminderPlan[];
     }
   | {
       ok: false;
@@ -23,6 +28,7 @@ export type ScheduledExamReminder = {
   examId: string;
   dedupeKey: string;
   notificationId: string;
+  scope: ReminderScope;
 };
 
 export function configureNotificationPresentation() {
@@ -58,18 +64,57 @@ export async function getScheduledCertbomReminders(): Promise<ScheduledExamRemin
     const daysBefore = [1, 3, 7].includes(Number(rawDaysBefore))
       ? Number(rawDaysBefore) as ReminderDaysBefore
       : 1;
-    return [{ examId, daysBefore, dedupeKey, notificationId: notification.identifier }];
+    const scope = notification.content.data?.scope === "critical" ? "critical" : "next";
+    return [{ examId, daysBefore, dedupeKey, notificationId: notification.identifier, scope }];
+  });
+}
+
+async function ensureReminderChannel() {
+  if (Platform.OS !== "android") return;
+  await Notifications.setNotificationChannelAsync(REMINDER_CHANNEL_ID, {
+    name: "관심 시험 알림",
+    description: "사용자가 직접 저장한 시험의 공식 접수·시험·발표 일정을 알려줍니다.",
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: "default",
+    vibrationPattern: [0, 250, 250, 250],
+  });
+}
+
+function reminderDedupeKey(examId: string, plan: ReminderPlan, scope: ReminderScope) {
+  return `certbom:${examId}:${plan.eventId ?? "official"}:${plan.daysBefore}d:${scope}:${plan.date.toISOString()}`;
+}
+
+async function schedulePlan(exam: Exam, plan: ReminderPlan, scope: ReminderScope) {
+  const trigger: Notifications.DateTriggerInput = {
+    type: Notifications.SchedulableTriggerInputTypes.DATE,
+    date: plan.date,
+    ...(Platform.OS === "android" ? { channelId: REMINDER_CHANNEL_ID } : {}),
+  };
+  return Notifications.scheduleNotificationAsync({
+    content: {
+      title: `${exam.name} 일정이 다가와요`,
+      body: `${plan.eventTitle} ${plan.daysBefore}일 전입니다. 공식 공고를 다시 확인해 주세요.`,
+      data: {
+        examId: exam.id,
+        officialUrl: exam.officialUrl,
+        daysBefore: plan.daysBefore,
+        scope,
+        dedupeKey: reminderDedupeKey(exam.id, plan, scope),
+      },
+      sound: "default",
+    },
+    trigger,
   });
 }
 
 export async function scheduleExamReminder(
   exam: Exam,
   daysBefore: ReminderDaysBefore = 1,
+  scope: ReminderScope = "next",
 ): Promise<ReminderScheduleResult> {
   try {
-    const nextEvent = getNextEvent(exam);
-    const plan = createReminderPlan(nextEvent, new Date(), daysBefore);
-    if (!plan) {
+    const plans = createExamReminderPlans(exam, daysBefore, scope);
+    if (!plans.length) {
       return {
         ok: false,
         reason: "no-schedule",
@@ -77,15 +122,7 @@ export async function scheduleExamReminder(
       };
     }
 
-    if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync(REMINDER_CHANNEL_ID, {
-        name: "관심 시험 알림",
-        description: "사용자가 직접 저장한 시험의 다음 공식 일정을 알려줍니다.",
-        importance: Notifications.AndroidImportance.HIGH,
-        sound: "default",
-        vibrationPattern: [0, 250, 250, 250],
-      });
-    }
+    await ensureReminderChannel();
 
     const currentPermission = await Notifications.getPermissionsAsync();
     const permission =
@@ -102,29 +139,9 @@ export async function scheduleExamReminder(
     }
 
     await cancelCertbomRemindersForExam(exam.id);
-    const trigger: Notifications.DateTriggerInput = {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: plan.date,
-      ...(Platform.OS === "android" ? { channelId: REMINDER_CHANNEL_ID } : {}),
-    };
-    const notificationId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: `${exam.name} 확인할 시간이에요`,
-        body: plan.timePrecision === "date-only"
-            ? `${plan.eventTitle} 전날입니다. 정확한 입실 시각은 공식 공고를 확인해 주세요.`
-            : `${plan.eventTitle} 하루 전입니다. 공식 공고를 확인해 주세요.`,
-        data: {
-          examId: exam.id,
-          officialUrl: exam.officialUrl,
-          daysBefore,
-          dedupeKey: `certbom:${exam.id}:${nextEvent?.id ?? "official"}:${daysBefore}d:${plan.date.toISOString()}`,
-        },
-        sound: "default",
-      },
-      trigger,
-    });
+    const notificationIds = await Promise.all(plans.map((plan) => schedulePlan(exam, plan, scope)));
 
-    return { ok: true, notificationId, plan };
+    return { ok: true, notificationIds, plans };
   } catch {
     return {
       ok: false,
@@ -137,36 +154,44 @@ export async function scheduleExamReminder(
 // 앱 시작 때 과거·삭제된 일정 알림을 치우고 일정 변경된 관심 시험만 다시 예약합니다.
 export async function reconcileCertbomReminders(
   exams: readonly Exam[],
-  preferences?: readonly { examId: string; daysBefore: ReminderDaysBefore }[],
+  preferences?: readonly { examId: string; daysBefore: ReminderDaysBefore; scope: ReminderScope }[],
 ): Promise<ScheduledExamReminder[]> {
   const scheduled = await getScheduledCertbomReminders();
   const byId = new Map(exams.map((exam) => [exam.id, exam]));
   const requested = preferences ?? scheduled.map((reminder) => ({
     examId: reminder.examId,
     daysBefore: reminder.daysBefore,
+    scope: reminder.scope,
   }));
-  const intended = new Map(requested.map((preference) => [preference.examId, preference.daysBefore]));
-  const exact = new Set<string>();
+  const intended = new Map(requested.map((preference) => [preference.examId, preference]));
+  const keep = new Set<string>();
 
   await Promise.all(scheduled.map(async (reminder) => {
     const exam = byId.get(reminder.examId);
-    const nextEvent = exam ? getNextEvent(exam) : undefined;
-    const daysBefore = intended.get(reminder.examId) ?? reminder.daysBefore;
-    const plan = createReminderPlan(nextEvent, new Date(), daysBefore);
-    const expectedKey = plan && exam
-      ? `certbom:${exam.id}:${nextEvent?.id ?? "official"}:${daysBefore}d:${plan.date.toISOString()}`
-      : null;
-    if (!intended.has(reminder.examId) || !exam || !plan || reminder.dedupeKey !== expectedKey || exact.has(reminder.examId)) {
+    const preference = intended.get(reminder.examId);
+    const expected = exam && preference
+      ? new Set(createExamReminderPlans(exam, preference.daysBefore, preference.scope).map((plan) => reminderDedupeKey(exam.id, plan, preference.scope)))
+      : new Set<string>();
+    if (!expected.has(reminder.dedupeKey) || keep.has(reminder.dedupeKey)) {
       await Notifications.cancelScheduledNotificationAsync(reminder.notificationId);
       return;
     }
-    exact.add(reminder.examId);
+    keep.add(reminder.dedupeKey);
   }));
 
-  for (const [examId, daysBefore] of intended) {
+  const permission = await Notifications.getPermissionsAsync();
+  if (permission.status !== "granted") return getScheduledCertbomReminders();
+  await ensureReminderChannel();
+  for (const [examId, preference] of intended) {
     const exam = byId.get(examId);
-    if (!exam || exact.has(examId) || !createReminderPlan(getNextEvent(exam), new Date(), daysBefore)) continue;
-    await scheduleExamReminder(exam, daysBefore);
+    if (!exam) continue;
+    const plans = createExamReminderPlans(exam, preference.daysBefore, preference.scope);
+    for (const plan of plans) {
+      const key = reminderDedupeKey(exam.id, plan, preference.scope);
+      if (keep.has(key)) continue;
+      await schedulePlan(exam, plan, preference.scope);
+      keep.add(key);
+    }
   }
 
   return getScheduledCertbomReminders();
