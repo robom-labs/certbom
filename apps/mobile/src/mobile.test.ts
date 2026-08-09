@@ -112,6 +112,11 @@ describe("로컬 알림 시각", () => {
     expect(createExamReminderPlans(reminderExam, 1, "next", now).map((plan) => plan.eventId)).toEqual(["open"]);
     expect(createExamReminderPlans(reminderExam, 1, "critical", now).map((plan) => plan.eventId)).toEqual(["open", "close", "exam", "result"]);
   });
+
+  it("이미 시작된 접수 일정 대신 다음으로 실제 예약 가능한 일정을 고른다", () => {
+    const now = new Date("2026-08-10T12:00:00+09:00");
+    expect(createExamReminderPlans(reminderExam, 1, "next", now).map((plan) => plan.eventId)).toEqual(["close"]);
+  });
 });
 
 describe("내 시험 준비 여정", () => {

@@ -1,5 +1,5 @@
 // 공식 시험 일정에 맞춘 로컬 알림 시각과 안내 문구를 계산한다.
-import { getNextEvent, type Exam, type ExamEvent } from "@certbom/core";
+import type { Exam, ExamEvent } from "@certbom/core";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1_000;
 
@@ -55,11 +55,12 @@ export function createExamReminderPlans(
   scope: ReminderScope,
   now = new Date(),
 ) {
-  const events = scope === "next"
-    ? [getNextEvent(exam)].filter((event): event is ExamEvent => Boolean(event))
-    : exam.events.filter((event) => CRITICAL_EVENT_TYPES.has(event.type));
-  return events.flatMap((event) => {
+  const events = [...exam.events]
+    .filter((event) => scope === "next" || CRITICAL_EVENT_TYPES.has(event.type))
+    .sort((left, right) => left.startAt.localeCompare(right.startAt));
+  const plans = events.flatMap((event) => {
     const plan = createReminderPlan(event, now, daysBefore);
     return plan ? [{ ...plan, eventId: event.id, eventType: event.type }] : [];
   });
+  return scope === "next" ? plans.slice(0, 1) : plans;
 }
