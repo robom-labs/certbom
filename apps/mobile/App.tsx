@@ -34,8 +34,10 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { getAdaptiveLayout } from "./src/adaptive-layout";
 import { BomMark, NativeIcon, type NativeIconName } from "./src/brand";
 import { parseExamDeepLink } from "./src/deep-link";
 import { journeyNextAction, journeyStageLabel, journeyStages } from "./src/journey";
@@ -93,6 +95,22 @@ const eventLabels: Record<ExamEvent["type"], string> = {
   changed: "변경",
   cancelled: "취소",
 };
+
+function useCertbomLayout() {
+  const { fontScale, width } = useWindowDimensions();
+  return useMemo(() => getAdaptiveLayout(width, fontScale), [fontScale, width]);
+}
+
+function adaptiveContentStyle(layout: ReturnType<typeof getAdaptiveLayout>, paddingBottom = 116) {
+  return [
+    styles.screenContent,
+    {
+      maxWidth: layout.contentMaxWidth,
+      paddingBottom,
+      paddingHorizontal: layout.horizontalPadding,
+    },
+  ];
+}
 
 function normalize(value: string) {
   return value.toLocaleLowerCase("ko-KR").replaceAll(" ", "");
@@ -186,13 +204,14 @@ function scheduledCountMap(items: Awaited<ReturnType<typeof getScheduledCertbomR
 }
 
 function BrandHeader({ compact = false, onOpenRobom }: { compact?: boolean; onOpenRobom: () => void }) {
+  const layout = useCertbomLayout();
   return (
     <Pressable
       accessibilityHint="로봄 공식 홈페이지를 브라우저에서 엽니다"
       accessibilityLabel="자격증봄 로봄 홈페이지 열기"
       accessibilityRole="link"
       onPress={onOpenRobom}
-      style={({ pressed }) => [styles.brandHeader, compact && styles.brandHeaderCompact, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.brandHeader, { maxWidth: layout.contentMaxWidth, paddingHorizontal: layout.horizontalPadding }, compact && styles.brandHeaderCompact, pressed && styles.pressed]}
     >
       <View style={styles.brandIcon}><Text style={styles.brandIconText}>✓</Text></View>
       <View style={styles.brandCopy}>
@@ -239,6 +258,7 @@ function HomeScreen({ checkedPreparationIds, favoriteIds, journeys, onFind, onOp
   onSelectFilter: (filter: HomeSummaryFilter) => void;
   onShowReminders: () => void;
 }) {
+  const layout = useCertbomLayout();
   const openAll = useMemo(() => getHomeSummaryExams("open"), []);
   const open = openAll.slice(0, 5);
   const upcoming = useMemo(() => getUpcomingEvents().slice(0, 5), []);
@@ -248,7 +268,7 @@ function HomeScreen({ checkedPreparationIds, favoriteIds, journeys, onFind, onOp
     .sort((a, b) => (getNextEvent(a)?.startAt ?? "9999").localeCompare(getNextEvent(b)?.startAt ?? "9999"))
     .slice(0, 3);
   return (
-    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={adaptiveContentStyle(layout)} showsVerticalScrollIndicator={false}>
       <View style={styles.heroCard}>
         <Text style={styles.heroKicker}>공식 일정 기준 · {new Date(CATALOG_REVIEWED_AT).toLocaleDateString("ko-KR", { year: "numeric", month: "long", timeZone: "Asia/Seoul" })} 검토본</Text>
         <Text style={styles.heroTitle}>접수할 시험과{`\n`}다음 일정을 <Text style={styles.heroHighlight}>한눈에.</Text></Text>
@@ -258,13 +278,13 @@ function HomeScreen({ checkedPreparationIds, favoriteIds, journeys, onFind, onOp
         </Pressable>
       </View>
 
-      <View style={styles.statGrid}>
+      <View style={[styles.statGrid, layout.statColumns === 1 && adaptiveStyles.statGridStacked]}>
         {[
           { filter: "all" as const, label: "전체 시험", value: catalogStats.examCount },
           { filter: "open" as const, label: "현재 접수", value: openAll.length },
           { filter: "upcoming" as const, label: "14일 내 시험", value: upcomingExamCount },
         ].map((item) => (
-          <Pressable key={item.filter} onPress={() => onSelectFilter(item.filter)} style={({ pressed }) => [styles.statCard, pressed && styles.pressed]}>
+          <Pressable key={item.filter} onPress={() => onSelectFilter(item.filter)} style={({ pressed }) => [styles.statCard, layout.statColumns === 1 && adaptiveStyles.statCardStacked, pressed && styles.pressed]}>
             <Text style={styles.statLabel}>{item.label}</Text><Text style={styles.statValue}>{item.value}<Text style={styles.statUnit}>개</Text></Text>
           </Pressable>
         ))}
@@ -308,6 +328,7 @@ function HomeScreen({ checkedPreparationIds, favoriteIds, journeys, onFind, onOp
 }
 
 function FindScreen({ favoriteIds, initialFilter, onOpen }: { favoriteIds: string[]; initialFilter: HomeSummaryFilter; onOpen: (exam: Exam) => void }) {
+  const layout = useCertbomLayout();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<HomeSummaryFilter>(initialFilter);
   useEffect(() => setFilter(initialFilter), [initialFilter]);
@@ -317,7 +338,7 @@ function FindScreen({ favoriteIds, initialFilter, onOpen }: { favoriteIds: strin
   }, [filter, query]);
   return (
     <View style={styles.flex}>
-      <View style={styles.findHeader}>
+      <View style={[styles.findHeader, { maxWidth: layout.contentMaxWidth, paddingHorizontal: layout.horizontalPadding }]}>
         <Text style={styles.pageEyebrow}>공식 출처를 묶어 찾기</Text><Text style={styles.pageTitle}>시험 찾기</Text>
         <View style={styles.searchBox}><NativeIcon name="search" size={21} /><TextInput accessibilityLabel="시험 검색" autoCorrect={false} onChangeText={setQuery} placeholder="시험명, 약칭, 기관 또는 분야" placeholderTextColor="#858ca0" returnKeyType="search" style={styles.searchInput} value={query} /></View>
         <View style={styles.filterRow}>
@@ -325,12 +346,24 @@ function FindScreen({ favoriteIds, initialFilter, onOpen }: { favoriteIds: strin
         </View>
         <Text style={styles.resultCount}>검색 결과 {results.length}개</Text>
       </View>
-      <FlatList contentContainerStyle={styles.findList} data={results} keyboardShouldPersistTaps="handled" keyExtractor={(exam) => exam.id} ListEmptyComponent={<View style={styles.emptyCard}><Text style={styles.emptyTitle}>조건에 맞는 시험이 없어요.</Text><Text style={styles.emptyText}>검색어를 지우거나 전체 필터로 바꿔 보세요.</Text></View>} renderItem={({ item }) => <ExamRow exam={item} favorite={favoriteIds.includes(item.id)} onPress={() => onOpen(item)} />} showsVerticalScrollIndicator={false} />
+      <FlatList
+        columnWrapperStyle={layout.listColumns === 2 ? adaptiveStyles.findColumn : undefined}
+        contentContainerStyle={[styles.findList, { maxWidth: layout.contentMaxWidth, paddingHorizontal: layout.horizontalPadding }]}
+        data={results}
+        keyboardShouldPersistTaps="handled"
+        key={`find-${layout.listColumns}`}
+        keyExtractor={(exam) => exam.id}
+        ListEmptyComponent={<View style={styles.emptyCard}><Text style={styles.emptyTitle}>조건에 맞는 시험이 없어요.</Text><Text style={styles.emptyText}>검색어를 지우거나 전체 필터로 바꿔 보세요.</Text></View>}
+        numColumns={layout.listColumns}
+        renderItem={({ item }) => <View style={adaptiveStyles.findGridItem}><ExamRow exam={item} favorite={favoriteIds.includes(item.id)} onPress={() => onOpen(item)} /></View>}
+        showsVerticalScrollIndicator={false}
+      />
     </View>
   );
 }
 
 function CalendarScreen({ favoriteIds, onOpen }: { favoriteIds: string[]; onOpen: (exam: Exam) => void }) {
+  const layout = useCertbomLayout();
   const [month, setMonth] = useState(currentKstMonth);
   const [selectedDate, setSelectedDate] = useState(currentKstDateKey);
   const [savedOnly, setSavedOnly] = useState(false);
@@ -344,7 +377,7 @@ function CalendarScreen({ favoriteIds, onOpen }: { favoriteIds: string[]; onOpen
     setSelectedDate(`${next}-01`);
   };
   return (
-    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={adaptiveContentStyle(layout)} showsVerticalScrollIndicator={false}>
       <View style={styles.pageTitleRow}><View><Text style={styles.pageEyebrow}>공식 일정 한눈에</Text><Text style={styles.pageTitle}>시험 달력</Text></View><Pressable accessibilityRole="button" onPress={() => setSavedOnly((value) => !value)} style={[styles.scopeButton, savedOnly && styles.scopeButtonActive]}><Text style={[styles.scopeButtonText, savedOnly && styles.scopeButtonTextActive]}>{savedOnly ? "관심만" : "전체"}</Text></Pressable></View>
       <View style={styles.calendarCard}>
         <View style={styles.monthHeader}><Pressable accessibilityLabel="이전 달" onPress={() => changeMonth(-1)} style={styles.monthButton}><NativeIcon name="back" /></Pressable><Text style={styles.monthTitle}>{monthLabel(month)}</Text><Pressable accessibilityLabel="다음 달" onPress={() => changeMonth(1)} style={styles.monthButton}><View style={{ transform: [{ rotate: "180deg" }] }}><NativeIcon name="back" /></View></Pressable></View>
@@ -368,9 +401,10 @@ function RemindersScreen({ checkedPreparationIds, favoriteIds, journeys, prefere
   onOpen: (exam: Exam) => void;
   onOpenNotificationSettings: () => void;
 }) {
+  const layout = useCertbomLayout();
   const favorites = favoriteIds.flatMap((id) => exams.filter((exam) => exam.id === id));
   return (
-    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={adaptiveContentStyle(layout)} showsVerticalScrollIndicator={false}>
       <View style={styles.pageTitleRow}><View><Text style={styles.pageEyebrow}>준비 상태와 기기 알림</Text><Text style={styles.pageTitle}>내 시험</Text></View><View style={styles.notificationStatus}><View style={[styles.statusDot, notificationStatus === "granted" ? styles.statusGood : styles.statusWarn]} /><Text style={styles.notificationStatusText}>{notificationStatus === "granted" ? "허용됨" : notificationStatus === "denied" ? "차단됨" : "확인 필요"}</Text></View></View>
       <View style={styles.infoCard}><NativeIcon color="#4058d8" name="bell" /><View style={styles.infoCopy}><Text style={styles.infoTitle}>시험별 진행과 알림을 함께 관리해요.</Text><Text style={styles.infoText}>접수·응시 상태와 준비 진행률을 남기고, 다음 일정 한 건 또는 중요 일정 전체를 1일·3일·7일 전에 받을 수 있어요.</Text></View></View>
       {notificationStatus === "denied" && <Pressable onPress={onOpenNotificationSettings} style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}><Text style={styles.outlineButtonText}>기기 알림 설정 열기</Text><NativeIcon color="#4058d8" name="external" size={18} /></Pressable>}
@@ -393,8 +427,9 @@ function SettingsScreen({ notificationStatus, onOpenBatterySettings, onOpenNotif
   onOpenNotificationSettings: () => void;
   onOpenUrl: (url: string, label: string) => void;
 }) {
+  const layout = useCertbomLayout();
   return (
-    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={adaptiveContentStyle(layout)} showsVerticalScrollIndicator={false}>
       <Text style={styles.pageEyebrow}>내 기기에 맞게</Text><Text style={styles.pageTitle}>설정</Text>
       <View style={styles.settingsCard}><Text style={styles.settingsTitle}>알림과 배터리</Text><Text style={styles.settingsText}>Android는 절전 상태에서 알림을 조금 늦출 수 있어요. 강제 예외 권한을 요구하지 않고, 사용자가 기기 설정에서 자격증봄을 직접 확인하도록 연결합니다.</Text><View style={styles.settingsActionList}><Pressable onPress={onOpenNotificationSettings} style={styles.settingsAction}><View><Text style={styles.settingsActionTitle}>앱 알림 설정</Text><Text style={styles.settingsActionMeta}>{notificationStatus === "granted" ? "현재 알림 허용됨" : "권한과 채널 상태 확인"}</Text></View><NativeIcon color="#4058d8" name="external" size={18} /></Pressable>{Platform.OS === "android" && <Pressable onPress={onOpenBatterySettings} style={styles.settingsAction}><View><Text style={styles.settingsActionTitle}>배터리 최적화 앱 목록</Text><Text style={styles.settingsActionMeta}>제조사 절전 설정에서 자격증봄 확인</Text></View><NativeIcon color="#4058d8" name="external" size={18} /></Pressable>}</View></View>
       <View style={styles.settingsCard}><Text style={styles.settingsTitle}>로봄 패밀리 앱</Text><Text style={styles.settingsText}>앱 이름을 누르면 로봄 공식 연결 주소를 브라우저에서 열어요.</Text>{FAMILY_APPS.map((app) => <Pressable accessibilityRole="link" key={app.id} onPress={() => onOpenUrl(app.url, app.name)} style={styles.familyRow}><View><Text style={styles.familyName}>{app.name}</Text><Text style={styles.familyDescription}>{app.description}</Text></View><NativeIcon color="#4058d8" name="external" size={19} /></Pressable>)}</View>
@@ -420,6 +455,7 @@ function DetailScreen({ checkedPreparationIds, exam, favorite, journey, reminder
   onTogglePreparation: (itemId: string) => void;
   onToggleTask: (taskId: string) => void;
 }) {
+  const layout = useCertbomLayout();
   const [taskDraft, setTaskDraft] = useState("");
   const next = getNextEvent(exam);
   const officialActions = getOfficialExamActions(exam);
@@ -436,7 +472,7 @@ function DetailScreen({ checkedPreparationIds, exam, favorite, journey, reminder
   return (
     <View style={styles.flex}>
       <View style={styles.detailHeader}><Pressable accessibilityLabel="이전 화면" onPress={onBack} style={styles.backButton}><NativeIcon name="back" /></Pressable><Text numberOfLines={1} style={styles.detailHeaderTitle}>{exam.name}</Text><View style={styles.backButton} /></View>
-      <ScrollView contentContainerStyle={styles.detailContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.detailContent, { maxWidth: layout.contentMaxWidth, paddingHorizontal: layout.horizontalPadding }]} showsVerticalScrollIndicator={false}>
         <View style={styles.detailHero}><Text style={styles.detailCategory}>{exam.category} · {exam.organizer}</Text><Text style={styles.detailTitle}>{exam.name}</Text><Text style={styles.detailDescription}>{exam.description}</Text><View style={styles.detailBadgeRow}><Text style={styles.detailBadge}>{isApplicationOpen(exam) ? "현재 접수 중" : "공식 일정 확인"}</Text><Text style={styles.detailBadge}>{exam.sourceName}</Text></View></View>
         <View style={styles.nextEventCard}><Text style={styles.nextEventLabel}>다음 일정 {next ? `· ${dDayLabel(next.startAt)}` : ""}</Text><Text style={styles.nextEventTitle}>{next?.title ?? "공식 원문에서 확인"}</Text><Text style={styles.nextEventDate}>{next ? formatDate(next.startAt, true) : "확정된 미래 일정이 없어요."}</Text></View>
         <View style={styles.detailActions}><Pressable onPress={onToggleFavorite} style={[styles.outlineButton, favorite && styles.outlineButtonActive]}><Text style={[styles.outlineButtonText, favorite && styles.outlineButtonTextActive]}>{favorite ? "관심 시험 저장됨" : "관심 시험에 저장"}</Text></Pressable><Pressable disabled={!next} onPress={onEditReminder} style={[styles.primaryButton, !next && styles.disabled]}><NativeIcon color="#ffffff" name="bell" size={20} /><Text style={styles.primaryButtonText}>{reminder ? `${reminder.daysBefore}일 전 알림 설정됨` : "알림 설정"}</Text></Pressable></View>
@@ -471,20 +507,40 @@ function ReminderEditor({ exam, existing, onCancel, onRemove, onSave, saving }: 
   onSave: (daysBefore: ReminderDaysBefore, scope: ReminderScope) => void;
   saving: boolean;
 }) {
+  const layout = useCertbomLayout();
   const [daysBefore, setDaysBefore] = useState<ReminderDaysBefore>(existing?.daysBefore ?? 1);
   const [scope, setScope] = useState<ReminderScope>(existing?.scope ?? "next");
   const firstPlan = createExamReminderPlans(exam, daysBefore, scope)[0];
   const next = exam.events.find((event) => event.id === firstPlan?.eventId);
   return (
     <Modal animationType="slide" onRequestClose={onCancel} transparent visible>
-      <View style={styles.modalBackdrop}><View style={styles.modalSheet}><ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}><View style={styles.modalHandle} /><View style={styles.modalHeader}><View><Text style={styles.pageEyebrow}>로컬 알림 설정</Text><Text style={styles.modalTitle}>{exam.name}</Text></View><Pressable accessibilityLabel="알림 설정 닫기" onPress={onCancel} style={styles.closeButton}><Text style={styles.closeButtonText}>닫기</Text></Pressable></View><View style={styles.modalEvent}><Text style={styles.nextEventLabel}>가장 가까운 예약 가능 일정</Text><Text style={styles.nextEventTitle}>{next?.title ?? "예약 가능한 일정 없음"}</Text><Text style={styles.nextEventDate}>{next ? formatDate(next.startAt, true) : "공식 원문을 확인해 주세요."}</Text></View><Text style={styles.optionTitle}>어떤 일정을 알려드릴까요?</Text><View style={styles.scopeOptions}>{([{ id: "next", title: "다음 일정", hint: "가장 가까운 공식 일정 한 건" }, { id: "critical", title: "중요 일정 전체", hint: "접수 시작·마감·시험·발표" }] as const).map((option) => <Pressable accessibilityState={{ selected: scope === option.id }} key={option.id} onPress={() => setScope(option.id)} style={[styles.scopeOption, scope === option.id && styles.reminderOptionActive]}><Text style={[styles.reminderOptionValue, scope === option.id && styles.reminderOptionValueActive]}>{option.title}</Text><Text style={[styles.reminderOptionHint, scope === option.id && styles.reminderOptionHintActive]}>{option.hint}</Text></Pressable>)}</View><Text style={styles.optionTitle}>언제 알려드릴까요?</Text><View style={styles.reminderOptions}>{([7, 3, 1] as const).map((days) => <Pressable accessibilityState={{ selected: daysBefore === days }} key={days} onPress={() => setDaysBefore(days)} style={[styles.reminderOption, daysBefore === days && styles.reminderOptionActive]}><Text style={[styles.reminderOptionValue, daysBefore === days && styles.reminderOptionValueActive]}>{days}일 전</Text><Text style={[styles.reminderOptionHint, daysBefore === days && styles.reminderOptionHintActive]}>{days === 1 ? "가장 가까운 기본 알림" : `${days}일 전에 미리 준비`}</Text></Pressable>)}</View><Text style={styles.modalNotice}>날짜만 공개된 일정은 선택한 날짜의 오전 9시를 기준으로 알립니다. Android 절전 상태에서는 운영체제가 알림을 조금 늦출 수 있어요.</Text><Pressable disabled={saving || !next} onPress={() => onSave(daysBefore, scope)} style={[styles.primaryButton, (saving || !next) && styles.disabled]}>{saving ? <ActivityIndicator color="#ffffff" /> : <><NativeIcon color="#ffffff" name="bell" size={20} /><Text style={styles.primaryButtonText}>{existing ? "알림 설정 저장" : "알림 예약"}</Text></>}</Pressable>{existing && <Pressable disabled={saving} onPress={onRemove} style={styles.removeButton}><Text style={styles.removeButtonText}>이 시험 알림 끄기</Text></Pressable>}</ScrollView></View></View>
+      <View style={[styles.modalBackdrop, layout.modalCentered && adaptiveStyles.modalBackdropCentered]}>
+        <View style={[styles.modalSheet, { maxWidth: layout.modalMaxWidth }, layout.modalCentered && adaptiveStyles.modalSheetCentered]}>
+          <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <View style={styles.flex}><Text style={styles.pageEyebrow}>로컬 알림 설정</Text><Text style={styles.modalTitle}>{exam.name}</Text></View>
+              <Pressable accessibilityLabel="알림 설정 닫기" onPress={onCancel} style={styles.closeButton}><Text style={styles.closeButtonText}>닫기</Text></Pressable>
+            </View>
+            <View style={styles.modalEvent}><Text style={styles.nextEventLabel}>가장 가까운 예약 가능 일정</Text><Text style={styles.nextEventTitle}>{next?.title ?? "예약 가능한 일정 없음"}</Text><Text style={styles.nextEventDate}>{next ? formatDate(next.startAt, true) : "공식 원문을 확인해 주세요."}</Text></View>
+            <Text style={styles.optionTitle}>어떤 일정을 알려드릴까요?</Text>
+            <View style={styles.scopeOptions}>{([{ id: "next", title: "다음 일정", hint: "가장 가까운 공식 일정 한 건" }, { id: "critical", title: "중요 일정 전체", hint: "접수 시작·마감·시험·발표" }] as const).map((option) => <Pressable accessibilityState={{ selected: scope === option.id }} key={option.id} onPress={() => setScope(option.id)} style={[styles.scopeOption, scope === option.id && styles.reminderOptionActive]}><Text style={[styles.reminderOptionValue, scope === option.id && styles.reminderOptionValueActive]}>{option.title}</Text><Text style={[styles.reminderOptionHint, scope === option.id && styles.reminderOptionHintActive]}>{option.hint}</Text></Pressable>)}</View>
+            <Text style={styles.optionTitle}>언제 알려드릴까요?</Text>
+            <View style={styles.reminderOptions}>{([7, 3, 1] as const).map((days) => <Pressable accessibilityState={{ selected: daysBefore === days }} key={days} onPress={() => setDaysBefore(days)} style={[styles.reminderOption, daysBefore === days && styles.reminderOptionActive]}><Text style={[styles.reminderOptionValue, daysBefore === days && styles.reminderOptionValueActive]}>{days}일 전</Text><Text style={[styles.reminderOptionHint, daysBefore === days && styles.reminderOptionHintActive]}>{days === 1 ? "가장 가까운 기본 알림" : `${days}일 전에 미리 준비`}</Text></Pressable>)}</View>
+            <Text style={styles.modalNotice}>날짜만 공개된 일정은 선택한 날짜의 오전 9시를 기준으로 알립니다. Android 절전 상태에서는 운영체제가 알림을 조금 늦출 수 있어요.</Text>
+            <Pressable disabled={saving || !next} onPress={() => onSave(daysBefore, scope)} style={[styles.primaryButton, (saving || !next) && styles.disabled]}>{saving ? <ActivityIndicator color="#ffffff" /> : <><NativeIcon color="#ffffff" name="bell" size={20} /><Text style={styles.primaryButtonText}>{existing ? "알림 설정 저장" : "알림 예약"}</Text></>}</Pressable>
+            {existing && <Pressable disabled={saving} onPress={onRemove} style={styles.removeButton}><Text style={styles.removeButtonText}>이 시험 알림 끄기</Text></Pressable>}
+          </ScrollView>
+        </View>
+      </View>
     </Modal>
   );
 }
 
 function BottomTabs({ active, onChange }: { active: TabId; onChange: (tab: TabId) => void }) {
+  const layout = useCertbomLayout();
   const insets = useSafeAreaInsets();
-  return <View style={[styles.bottomTabs, { paddingBottom: Math.max(insets.bottom, 8) }]}>{tabs.map((tab) => { const selected = active === tab.id; return <Pressable accessibilityRole="tab" accessibilityState={{ selected }} key={tab.id} onPress={() => onChange(tab.id)} style={styles.tabButton}><NativeIcon color={selected ? "#4058d8" : "#7a8195"} name={tab.icon} size={23} /><Text style={[styles.tabLabel, selected && styles.tabLabelActive]}>{tab.label}</Text>{selected && <View style={styles.tabIndicator} />}</Pressable>; })}</View>;
+  return <View style={[styles.bottomTabs, { maxWidth: layout.navigationMaxWidth, paddingBottom: Math.max(insets.bottom, 8) }]}>{tabs.map((tab) => { const selected = active === tab.id; return <Pressable accessibilityRole="tab" accessibilityState={{ selected }} key={tab.id} onPress={() => onChange(tab.id)} style={styles.tabButton}><NativeIcon color={selected ? "#4058d8" : "#7a8195"} name={tab.icon} size={23} /><Text style={[styles.tabLabel, selected && styles.tabLabelActive]}>{tab.label}</Text>{selected && <View style={styles.tabIndicator} />}</Pressable>; })}</View>;
 }
 
 function MobileApp() {
@@ -745,5 +801,32 @@ const styles = StyleSheet.create({
   detailHeader: { minHeight: 62, flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: "#e5e8f0", backgroundColor: "#fffefb", paddingHorizontal: 10 }, backButton: { width: 48, height: 48, alignItems: "center", justifyContent: "center" }, detailHeaderTitle: { flex: 1, color: "#263149", fontSize: 16, fontWeight: "800", textAlign: "center" }, detailContent: { width: "100%", maxWidth: 760, alignSelf: "center", padding: 16, paddingBottom: 60 }, detailHero: { borderRadius: 24, backgroundColor: "#eef0ff", padding: 20 }, detailCategory: { color: "#5d6bc5", fontSize: 12, fontWeight: "800" }, detailTitle: { marginTop: 7, color: "#18233c", fontSize: 27, fontWeight: "900", letterSpacing: -1 }, detailDescription: { marginTop: 10, color: "#59627a", fontSize: 14, lineHeight: 21 }, detailBadgeRow: { marginTop: 13, flexDirection: "row", flexWrap: "wrap", gap: 7 }, detailBadge: { color: "#4058d8", fontSize: 11, fontWeight: "800", borderRadius: 10, backgroundColor: "#ffffff", paddingHorizontal: 8, paddingVertical: 5, overflow: "hidden" }, nextEventCard: { marginTop: 12, borderWidth: 1, borderColor: "#e1e4ed", borderRadius: 19, backgroundColor: "#ffffff", padding: 16 }, nextEventLabel: { color: "#6573c7", fontSize: 11, fontWeight: "800" }, nextEventTitle: { marginTop: 5, color: "#202c45", fontSize: 17, fontWeight: "900" }, nextEventDate: { marginTop: 5, color: "#6f7689", fontSize: 13 }, detailActions: { marginTop: 2 }, detailEventRow: { minHeight: 74, marginBottom: 8, flexDirection: "row", alignItems: "flex-start", gap: 11, borderRadius: 17, backgroundColor: "#ffffff", padding: 14 }, detailEventDot: { width: 10, height: 10, marginTop: 5, borderRadius: 5 }, detailEventCopy: { flex: 1 }, detailEventType: { color: "#6674ca", fontSize: 11, fontWeight: "800" }, detailEventTitle: { marginTop: 3, color: "#28344d", fontSize: 14, fontWeight: "800" }, detailEventDate: { marginTop: 4, color: "#7d8494", fontSize: 12 }, preparationProgress: { marginBottom: 11, borderRadius: 18, backgroundColor: "#eef0ff", padding: 14 }, preparationProgressCopy: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, preparationProgressTitle: { color: "#26345e", fontSize: 15, fontWeight: "900" }, preparationProgressMeta: { color: "#6573c7", fontSize: 12, fontWeight: "800" }, preparationProgressTrack: { height: 8, marginTop: 10, overflow: "hidden", borderRadius: 4, backgroundColor: "#d6dcfa" }, preparationProgressValue: { height: 8, borderRadius: 4, backgroundColor: "#4058d8" }, preparationRow: { minHeight: 72, marginBottom: 9, flexDirection: "row", alignItems: "flex-start", gap: 11, borderWidth: 1, borderColor: "#e1e4ed", borderRadius: 18, backgroundColor: "#ffffff", padding: 14 }, preparationRowChecked: { borderColor: "#b9c3f4", backgroundColor: "#f6f7ff" }, preparationCheckbox: { width: 26, height: 26, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#b4bac8", borderRadius: 8, backgroundColor: "#ffffff" }, preparationCheckboxChecked: { borderColor: "#4058d8", backgroundColor: "#4058d8" }, preparationCheckText: { color: "#ffffff", fontSize: 15, fontWeight: "900" }, preparationMark: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#8b93a6" }, preparationMarkRequired: { backgroundColor: "#4058d8" }, preparationMarkForbidden: { backgroundColor: "#d65c53" }, preparationCopy: { flex: 1 }, preparationTitleRow: { flexDirection: "row", alignItems: "center", gap: 7 }, preparationTitle: { flexShrink: 1, color: "#28344d", fontSize: 14, fontWeight: "800" }, preparationTitleChecked: { color: "#69738d", textDecorationLine: "line-through" }, preparationText: { marginTop: 5, color: "#697084", fontSize: 12, lineHeight: 18 }, preparationSource: { marginTop: 7, color: "#7d87c1", fontSize: 10, fontWeight: "700" },
   stageRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 }, stageChip: { minHeight: 44, justifyContent: "center", borderWidth: 1, borderColor: "#dfe2ec", borderRadius: 14, backgroundColor: "#ffffff", paddingHorizontal: 13 }, stageChipActive: { borderColor: "#4058d8", backgroundColor: "#eef0ff" }, stageChipText: { color: "#747b8e", fontSize: 12, fontWeight: "800" }, stageChipTextActive: { color: "#4058d8" }, nextActionCard: { marginTop: 10, borderRadius: 18, backgroundColor: "#eef0ff", padding: 15 }, nextActionLabel: { color: "#6573c7", fontSize: 11, fontWeight: "800" }, nextActionTitle: { marginTop: 5, color: "#27345a", fontSize: 16, fontWeight: "900" }, taskComposer: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderColor: "#dfe2ec", borderRadius: 17, backgroundColor: "#ffffff", padding: 7 }, taskInput: { flex: 1, minHeight: 48, color: "#27324a", fontSize: 14, paddingHorizontal: 9 }, taskAddButton: { minWidth: 58, minHeight: 46, alignItems: "center", justifyContent: "center", borderRadius: 13, backgroundColor: "#4058d8" }, taskAddButtonText: { color: "#ffffff", fontSize: 13, fontWeight: "900" }, taskProgressText: { marginTop: 10, marginBottom: 8, color: "#6674ca", fontSize: 12, fontWeight: "800" }, personalTaskRow: { minHeight: 62, marginBottom: 8, flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "#e1e4ed", borderRadius: 17, backgroundColor: "#ffffff", paddingHorizontal: 12 }, personalTaskToggle: { flex: 1, minHeight: 58, flexDirection: "row", alignItems: "center", gap: 10 }, personalTaskLabel: { flex: 1, color: "#2b364e", fontSize: 14, fontWeight: "800" }, taskDeleteButton: { minWidth: 48, minHeight: 44, alignItems: "center", justifyContent: "center" }, taskDeleteText: { color: "#ad4e47", fontSize: 12, fontWeight: "800" },
   modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(20,26,43,.36)" }, modalSheet: { maxHeight: "92%", borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: "#f8f9fc", paddingHorizontal: 18 }, modalScroll: { paddingBottom: 26 }, modalHandle: { width: 42, height: 5, alignSelf: "center", marginTop: 9, marginBottom: 10, borderRadius: 3, backgroundColor: "#c9cdd8" }, modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, modalTitle: { marginTop: 3, color: "#1f2a43", fontSize: 23, fontWeight: "900" }, closeButton: { minWidth: 50, minHeight: 44, alignItems: "center", justifyContent: "center" }, closeButtonText: { color: "#4058d8", fontSize: 14, fontWeight: "800" }, modalEvent: { marginTop: 16, borderRadius: 18, backgroundColor: "#ffffff", padding: 15 }, optionTitle: { marginTop: 22, marginBottom: 10, color: "#27324a", fontSize: 16, fontWeight: "900" }, scopeOptions: { gap: 8 }, scopeOption: { minHeight: 62, justifyContent: "center", borderWidth: 1, borderColor: "#dfe2ec", borderRadius: 17, backgroundColor: "#ffffff", paddingHorizontal: 15 }, reminderOptions: { gap: 8 }, reminderOption: { minHeight: 64, justifyContent: "center", borderWidth: 1, borderColor: "#dfe2ec", borderRadius: 17, backgroundColor: "#ffffff", paddingHorizontal: 15 }, reminderOptionActive: { borderColor: "#4058d8", backgroundColor: "#eef0ff" }, reminderOptionValue: { color: "#303b52", fontSize: 15, fontWeight: "900" }, reminderOptionValueActive: { color: "#4058d8" }, reminderOptionHint: { marginTop: 3, color: "#858b9b", fontSize: 11 }, reminderOptionHintActive: { color: "#6876c8" }, modalNotice: { marginTop: 13, color: "#72798b", fontSize: 11, lineHeight: 17 }, removeButton: { minHeight: 50, marginTop: 8, alignItems: "center", justifyContent: "center" }, removeButtonText: { color: "#ad4e47", fontSize: 14, fontWeight: "800" },
-  bottomTabs: { minHeight: 68, flexDirection: "row", borderTopWidth: 1, borderTopColor: "#dfe2eb", backgroundColor: "#fffefb", paddingTop: 5 }, tabButton: { flex: 1, minHeight: 54, alignItems: "center", justifyContent: "center", gap: 2 }, tabLabel: { color: "#7a8195", fontSize: 10, fontWeight: "700" }, tabLabelActive: { color: "#4058d8", fontWeight: "900" }, tabIndicator: { position: "absolute", top: -5, width: 26, height: 3, borderRadius: 2, backgroundColor: "#4058d8" },
+  bottomTabs: { width: "100%", minHeight: 68, alignSelf: "center", flexDirection: "row", borderTopWidth: 1, borderTopColor: "#dfe2eb", backgroundColor: "#fffefb", paddingTop: 5 }, tabButton: { flex: 1, minHeight: 54, alignItems: "center", justifyContent: "center", gap: 2 }, tabLabel: { color: "#7a8195", fontSize: 10, fontWeight: "700" }, tabLabelActive: { color: "#4058d8", fontWeight: "900" }, tabIndicator: { position: "absolute", top: -5, width: 26, height: 3, borderRadius: 2, backgroundColor: "#4058d8" },
+});
+
+const adaptiveStyles = StyleSheet.create({
+  modalBackdropCentered: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modalSheetCentered: {
+    width: "100%",
+    borderRadius: 28,
+  },
+  statGridStacked: {
+    flexDirection: "column",
+  },
+  statCardStacked: {
+    flex: 0,
+    minHeight: 70,
+    width: "100%",
+  },
+  findColumn: {
+    gap: 12,
+  },
+  findGridItem: {
+    flex: 1,
+    minWidth: 0,
+  },
 });

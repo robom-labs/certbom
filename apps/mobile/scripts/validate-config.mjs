@@ -40,6 +40,8 @@ assert(!expo.android.intentFilters.some((filter) => filter.autoVerify === true),
 const buildProperties = expo.plugins.find((plugin) => Array.isArray(plugin) && plugin[0] === "expo-build-properties");
 assert(buildProperties?.[1]?.android?.compileSdkVersion >= 36, "Android compileSdkVersion은 36 이상이어야 합니다.");
 assert(buildProperties?.[1]?.android?.targetSdkVersion === 36, "Android targetSdkVersion은 36이어야 합니다.");
+assert(buildProperties?.[1]?.android?.enableMinifyInReleaseBuilds === true, "Android release R8 코드 최적화를 켜야 합니다.");
+assert(buildProperties?.[1]?.android?.enableShrinkResourcesInReleaseBuilds === true, "Android release 리소스 축소를 켜야 합니다.");
 for (const profile of ["development", "preview", "production"]) {
   assert(easConfig.build[profile], `EAS ${profile} 프로필이 필요합니다.`);
 }

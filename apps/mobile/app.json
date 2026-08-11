@@ -14,13 +14,13 @@
     "icon": "./assets/icon.png",
     "ios": {
       "bundleIdentifier": "kr.robom.certbom",
-      "buildNumber": "11",
+      "buildNumber": "12",
       "supportsTablet": true,
       "associatedDomains": []
     },
     "android": {
       "package": "kr.robom.certbom",
-      "versionCode": 15,
+      "versionCode": 16,
       "permissions": [
         "android.permission.POST_NOTIFICATIONS"
       ],
@@ -49,7 +49,9 @@
         {
           "android": {
             "compileSdkVersion": 36,
-            "targetSdkVersion": 36
+            "targetSdkVersion": 36,
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
           }
         }
       ]
