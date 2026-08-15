@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-14T18:37:14.589Z",
+  "generatedAt": "2026-08-15T18:09:35.893Z",
   "sources": [
     {
       "sourceId": "qnet-technical-plan-2026",
@@ -8,8 +8,8 @@
       "httpStatus": 200,
       "ok": true,
       "contentLength": 225387,
-      "contentSha256": "47bd74c5c47da9e39b7c0dc131d1c73fe18bcc2708f447aec4947c026bfa8fd4",
-      "checkedAt": "2026-08-14T18:37:14.589Z"
+      "contentSha256": "deefe7c104fa955a10e648c0501deb6aa460fe96f6cf99d36292550b7b04f064",
+      "checkedAt": "2026-08-15T18:09:35.893Z"
     },
     {
       "sourceId": "qnet-professional-calendar-2026",
@@ -18,7 +18,7 @@
       "ok": true,
       "contentLength": 4684695,
       "contentSha256": "04c92def1847d62452712d36eed7040610ab9624bc6d7657b9b26bdc902432e2",
-      "checkedAt": "2026-08-14T18:37:14.589Z"
+      "checkedAt": "2026-08-15T18:09:35.893Z"
     },
     {
       "sourceId": "historyexam-schedule-2026",
@@ -27,7 +27,7 @@
       "ok": true,
       "contentLength": 24877,
       "contentSha256": "ef20803d4727ee054aa337c715e9f062746f5363f00ec1fe704dbaeb49a8b6b1",
-      "checkedAt": "2026-08-14T18:37:14.589Z"
+      "checkedAt": "2026-08-15T18:09:35.893Z"
     },
     {
       "sourceId": "kdata-calendar-2026",
@@ -35,8 +35,8 @@
       "httpStatus": 200,
       "ok": true,
       "contentLength": 41658,
-      "contentSha256": "c6834f05dc3a0c130bcbba0f9f730a198c427e8049194eb0f87be9c3b79f679d",
-      "checkedAt": "2026-08-14T18:37:14.589Z"
+      "contentSha256": "b23d061de1a1cb0e4c6958b2efdeb894b1307bb41550a62c3e2f7053fc11e3cd",
+      "checkedAt": "2026-08-15T18:09:35.893Z"
     },
     {
       "sourceId": "kpc-current-registration-2026",
@@ -44,8 +44,8 @@
       "httpStatus": 200,
       "ok": true,
       "contentLength": 205000,
-      "contentSha256": "b14f6d77b0fbff42444901c1e9f8bc7729466edf88831a0e29144a08b084c5b9",
-      "checkedAt": "2026-08-14T18:37:14.589Z"
+      "contentSha256": "d20721efd7dbaf1d78f7a2f7032ae8edcbc365df3cd97165e326d17da06b5d4e",
+      "checkedAt": "2026-08-15T18:09:35.893Z"
     },
     {
       "sourceId": "at-calendar-2026",
@@ -54,7 +54,7 @@
       "ok": true,
       "contentLength": 58567,
       "contentSha256": "43fc6ed0b018e437f0ab5a819427f893e57722ac4fdc39135947021dcad8f46e",
-      "checkedAt": "2026-08-14T18:37:14.589Z"
+      "checkedAt": "2026-08-15T18:09:35.893Z"
     },
     {
       "sourceId": "korcham-calendar-2026",
@@ -63,7 +63,7 @@
       "ok": true,
       "contentLength": 54786,
       "contentSha256": "4d183c9582fbb1514defc07a99b1d541215930e07e2ea41e71a229ba2c560cee",
-      "checkedAt": "2026-08-14T18:37:14.589Z"
+      "checkedAt": "2026-08-15T18:09:35.893Z"
     },
     {
       "sourceId": "gosi-announcement-2026",
@@ -72,7 +72,7 @@
       "ok": true,
       "contentLength": 168,
       "contentSha256": "85082bff97ea0e8c45a0768b7327446a913ccd7edfee7435ad50bf2f52a4f2c8",
-      "checkedAt": "2026-08-14T18:37:14.589Z"
+      "checkedAt": "2026-08-15T18:09:35.893Z"
     }
   ]
 }
