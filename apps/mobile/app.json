@@ -2,7 +2,7 @@
   "expo": {
     "name": "자격증봄",
     "slug": "certbom",
-    "version": "0.9.1",
+    "version": "0.9.0",
     "description": "자격증 공식 일정·D-Day·로컬 알림·준비 체크리스트를 한곳에서 관리하는 자격증봄",
     "platforms": [
       "ios",
