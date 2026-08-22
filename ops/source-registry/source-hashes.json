@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-21T18:18:16.792Z",
+  "generatedAt": "2026-08-22T10:41:37.478Z",
   "sources": [
     {
       "sourceId": "qnet-technical-plan-2026",
@@ -8,8 +8,8 @@
       "httpStatus": 200,
       "ok": true,
       "contentLength": 225377,
-      "contentSha256": "5dbb0dd6840a564332237a4f6e28c81b0bcb63a66f2137e66f8a751ac69fc20d",
-      "checkedAt": "2026-08-21T18:18:16.792Z"
+      "contentSha256": "a175a6ded688fafbfd277ce5e51002ed9cce25c06a114118fa834b61d6cbf50a",
+      "checkedAt": "2026-08-22T10:41:37.478Z"
     },
     {
       "sourceId": "qnet-professional-calendar-2026",
@@ -18,7 +18,7 @@
       "ok": true,
       "contentLength": 4684695,
       "contentSha256": "04c92def1847d62452712d36eed7040610ab9624bc6d7657b9b26bdc902432e2",
-      "checkedAt": "2026-08-21T18:18:16.792Z"
+      "checkedAt": "2026-08-22T10:41:37.478Z"
     },
     {
       "sourceId": "historyexam-schedule-2026",
@@ -27,16 +27,16 @@
       "ok": true,
       "contentLength": 24877,
       "contentSha256": "ef20803d4727ee054aa337c715e9f062746f5363f00ec1fe704dbaeb49a8b6b1",
-      "checkedAt": "2026-08-21T18:18:16.792Z"
+      "checkedAt": "2026-08-22T10:41:37.478Z"
     },
     {
       "sourceId": "kdata-calendar-2026",
       "url": "https://www.dataq.or.kr/www/accept/schedule.do",
       "httpStatus": 200,
       "ok": true,
-      "contentLength": 40035,
-      "contentSha256": "5aaf6493fbb2aa6d529b0c04c0e6b00d1607db5e8a2526818e6ea12ab91b2e39",
-      "checkedAt": "2026-08-21T18:18:16.792Z"
+      "contentLength": 40033,
+      "contentSha256": "bc1d964af87624cbaa7f54a454100b6cc21fea122fadad68db420c60c1facd60",
+      "checkedAt": "2026-08-22T10:41:37.478Z"
     },
     {
       "sourceId": "kpc-current-registration-2026",
@@ -45,16 +45,16 @@
       "ok": true,
       "contentLength": 203573,
       "contentSha256": "33998e6062a07073c80f5e765daf98455c8bbdd966c459357a32c3e110c14362",
-      "checkedAt": "2026-08-21T18:18:16.792Z"
+      "checkedAt": "2026-08-22T10:41:37.478Z"
     },
     {
       "sourceId": "at-calendar-2026",
       "url": "https://at.kicpa.or.kr/home/main_2026.jsp",
       "httpStatus": 200,
       "ok": true,
-      "contentLength": 58572,
-      "contentSha256": "34269136a3f1cb5350145787b2eb4a72f2bd2d7adfbfaba066cce8c2384a9947",
-      "checkedAt": "2026-08-21T18:18:16.792Z"
+      "contentLength": 58555,
+      "contentSha256": "94ce6b7119278f6e0406f80fb3d372023557ee723f17d80a3db557d72083999d",
+      "checkedAt": "2026-08-22T10:41:37.478Z"
     },
     {
       "sourceId": "korcham-calendar-2026",
@@ -63,7 +63,7 @@
       "ok": true,
       "contentLength": 54786,
       "contentSha256": "4d183c9582fbb1514defc07a99b1d541215930e07e2ea41e71a229ba2c560cee",
-      "checkedAt": "2026-08-21T18:18:16.792Z"
+      "checkedAt": "2026-08-22T10:41:37.478Z"
     },
     {
       "sourceId": "gosi-announcement-2026",
@@ -72,7 +72,7 @@
       "ok": true,
       "contentLength": 168,
       "contentSha256": "85082bff97ea0e8c45a0768b7327446a913ccd7edfee7435ad50bf2f52a4f2c8",
-      "checkedAt": "2026-08-21T18:18:16.792Z"
+      "checkedAt": "2026-08-22T10:41:37.478Z"
     }
   ]
 }

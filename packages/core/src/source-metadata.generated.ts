@@ -4,7 +4,7 @@ export const CATALOG_DATA_VERSION = "2026.07.24-v4";
 export const CATALOG_REVIEWED_AT = "2026-07-24T14:30:00+09:00";
 
 export const SOURCE_REVIEWED_AT = {
-  "qnet-technical-plan-2026": "2026-07-24T14:30:00+09:00",
+  "qnet-technical-plan-2026": "2026-08-22T19:41:37+09:00",
   "qnet-professional-calendar-2026": "2026-07-16T15:00:00+09:00",
   "historyexam-schedule-2026": "2026-07-24T14:30:00+09:00",
   "kdata-calendar-2026": "2026-07-24T14:30:00+09:00",
@@ -15,16 +15,16 @@ export const SOURCE_REVIEWED_AT = {
 } as const;
 
 export const SOURCE_CONNECTION_STATUS = {
-  "checkedAt": "2026-08-21T18:18:16.792Z",
+  "checkedAt": "2026-08-22T10:41:37.478Z",
   "healthyCount": 8,
   "totalCount": 8,
   "failedSourceIds": []
 } as const;
 
 export const SOURCE_FRESHNESS_STATUS = {
-  "checkedAt": "2026-08-21T18:18:16.792Z",
-  "freshCount": 0,
-  "staleCount": 8,
+  "checkedAt": "2026-08-22T10:41:37.478Z",
+  "freshCount": 1,
+  "staleCount": 7,
   "totalCount": 8,
   "staleSourceIds": [
     "at-calendar-2026",
@@ -33,22 +33,21 @@ export const SOURCE_FRESHNESS_STATUS = {
     "kdata-calendar-2026",
     "korcham-calendar-2026",
     "kpc-current-registration-2026",
-    "qnet-professional-calendar-2026",
-    "qnet-technical-plan-2026"
+    "qnet-professional-calendar-2026"
   ],
   "sources": [
     {
       "sourceId": "qnet-technical-plan-2026",
-      "lastReviewedAt": "2026-07-24T14:30:00+09:00",
-      "ageHours": 684,
+      "lastReviewedAt": "2026-08-22T19:41:37+09:00",
+      "ageHours": 0,
       "staleAfterHours": 48,
-      "staleAt": "2026-07-26T05:30:00.000Z",
-      "state": "stale"
+      "staleAt": "2026-08-24T10:41:37.000Z",
+      "state": "fresh"
     },
     {
       "sourceId": "qnet-professional-calendar-2026",
       "lastReviewedAt": "2026-07-16T15:00:00+09:00",
-      "ageHours": 876,
+      "ageHours": 892,
       "staleAfterHours": 48,
       "staleAt": "2026-07-18T06:00:00.000Z",
       "state": "stale"
@@ -56,7 +55,7 @@ export const SOURCE_FRESHNESS_STATUS = {
     {
       "sourceId": "historyexam-schedule-2026",
       "lastReviewedAt": "2026-07-24T14:30:00+09:00",
-      "ageHours": 684,
+      "ageHours": 701,
       "staleAfterHours": 72,
       "staleAt": "2026-07-27T05:30:00.000Z",
       "state": "stale"
@@ -64,7 +63,7 @@ export const SOURCE_FRESHNESS_STATUS = {
     {
       "sourceId": "kdata-calendar-2026",
       "lastReviewedAt": "2026-07-24T14:30:00+09:00",
-      "ageHours": 684,
+      "ageHours": 701,
       "staleAfterHours": 72,
       "staleAt": "2026-07-27T05:30:00.000Z",
       "state": "stale"
@@ -72,7 +71,7 @@ export const SOURCE_FRESHNESS_STATUS = {
     {
       "sourceId": "kpc-current-registration-2026",
       "lastReviewedAt": "2026-07-16T15:00:00+09:00",
-      "ageHours": 876,
+      "ageHours": 892,
       "staleAfterHours": 48,
       "staleAt": "2026-07-18T06:00:00.000Z",
       "state": "stale"
@@ -80,7 +79,7 @@ export const SOURCE_FRESHNESS_STATUS = {
     {
       "sourceId": "at-calendar-2026",
       "lastReviewedAt": "2026-07-24T14:30:00+09:00",
-      "ageHours": 684,
+      "ageHours": 701,
       "staleAfterHours": 72,
       "staleAt": "2026-07-27T05:30:00.000Z",
       "state": "stale"
@@ -88,7 +87,7 @@ export const SOURCE_FRESHNESS_STATUS = {
     {
       "sourceId": "korcham-calendar-2026",
       "lastReviewedAt": "2026-07-16T15:00:00+09:00",
-      "ageHours": 876,
+      "ageHours": 892,
       "staleAfterHours": 72,
       "staleAt": "2026-07-19T06:00:00.000Z",
       "state": "stale"
@@ -96,7 +95,7 @@ export const SOURCE_FRESHNESS_STATUS = {
     {
       "sourceId": "gosi-announcement-2026",
       "lastReviewedAt": "2026-07-16T15:00:00+09:00",
-      "ageHours": 876,
+      "ageHours": 892,
       "staleAfterHours": 72,
       "staleAt": "2026-07-19T06:00:00.000Z",
       "state": "stale"
