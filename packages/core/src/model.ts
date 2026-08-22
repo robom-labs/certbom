@@ -13,6 +13,8 @@ export type ExamEventType =
   | "changed"
   | "cancelled";
 
+export type ExamAttemptStage = "written" | "practical" | "interview";
+
 export type ExamEvent = {
   id: string;
   examId: string;
@@ -25,6 +27,16 @@ export type ExamEvent = {
   confirmed: boolean;
   regionCode?: string;
   groupKey?: string;
+  attemptKey?: string;
+  attemptLabel?: string;
+  attemptStage?: ExamAttemptStage;
+};
+
+export type ExamAttempt = {
+  key: string;
+  label: string;
+  stage: ExamAttemptStage;
+  events: ExamEvent[];
 };
 
 export type PreparationItem = {

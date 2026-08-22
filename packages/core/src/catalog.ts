@@ -1,6 +1,6 @@
 // 공식 일정 스냅샷을 앱에서 쓰는 시험 카탈로그와 탐색 도우미로 변환한다.
 import { CATALOG_DATA_VERSION, CATALOG_UPDATED_AT, catalogSources, examSeeds } from "./catalog-data";
-import type { Exam, ExamEvent, HomeSummaryFilter, PreparationItem } from "./model";
+import type { Exam, ExamAttempt, ExamEvent, HomeSummaryFilter, PreparationItem } from "./model";
 import {
   CATALOG_REVIEWED_AT,
   SOURCE_CONNECTION_STATUS,
@@ -305,7 +305,11 @@ export function eventRelevantUntil(event: ExamEvent) {
 }
 
 export function getNextEvent(exam: Exam, now = new Date()) {
-  return exam.events
+  return getNextEventFromEvents(exam.events, now);
+}
+
+export function getNextEventFromEvents(events: readonly ExamEvent[], now = new Date()) {
+  return events
     .filter((event) => eventRelevantUntil(event) >= now.getTime())
     .sort((a, b) => {
       const aStart = new Date(a.startAt).getTime();
@@ -315,6 +319,33 @@ export function getNextEvent(exam: Exam, now = new Date()) {
       if (aActive !== bActive) return aActive ? -1 : 1;
       return aStart - bStart;
     })[0];
+}
+
+// 공식 데이터가 명시한 회차·단계만 사용자 선택 대상으로 묶는다.
+export function getExamAttempts(exam: Exam): ExamAttempt[] {
+  const attempts = new Map<string, ExamAttempt>();
+  for (const event of exam.events) {
+    if (!event.attemptKey || !event.attemptLabel || !event.attemptStage) continue;
+    const current = attempts.get(event.attemptKey);
+    if (current) current.events.push(event);
+    else attempts.set(event.attemptKey, {
+      key: event.attemptKey,
+      label: event.attemptLabel,
+      stage: event.attemptStage,
+      events: [event],
+    });
+  }
+  return [...attempts.values()]
+    .map((attempt) => ({ ...attempt, events: attempt.events.slice().sort((left, right) => left.startAt.localeCompare(right.startAt)) }))
+    .sort((left, right) => (left.events[0]?.startAt ?? "").localeCompare(right.events[0]?.startAt ?? ""));
+}
+
+export function getAttemptEvents(exam: Exam, attemptKey?: string) {
+  return attemptKey ? exam.events.filter((event) => event.attemptKey === attemptKey) : exam.events;
+}
+
+export function getNextAttemptEvent(exam: Exam, attemptKey?: string, now = new Date()) {
+  return getNextEventFromEvents(getAttemptEvents(exam, attemptKey), now);
 }
 
 export function getUpcomingEvents(now = new Date()) {

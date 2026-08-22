@@ -1,5 +1,5 @@
 // 공식 기관에서 확인한 2026 시험 종목과 일정 스냅샷을 구조화한다.
-import type { ExamEventType, PreparationItem, ScheduleType, TimePrecision, TrustLevel } from "./model";
+import type { ExamAttemptStage, ExamEventType, PreparationItem, ScheduleType, TimePrecision, TrustLevel } from "./model";
 import { CATALOG_DATA_VERSION, CATALOG_REVIEWED_AT } from "./source-metadata.generated";
 
 export { CATALOG_DATA_VERSION };
@@ -23,6 +23,9 @@ export type EventSeed = {
   officialSourceUrl?: string;
   regionCode?: string;
   groupKey?: string;
+  attemptKey?: string;
+  attemptLabel?: string;
+  attemptStage?: ExamAttemptStage;
 };
 
 type PreparationSeed = Pick<PreparationItem, "category" | "label" | "detail" | "required"> & Partial<Omit<PreparationItem, "id" | "officialSourceUrl" | "category" | "label" | "detail" | "required">> & {
@@ -142,6 +145,7 @@ const exactEvent = (
   endDate?: string,
   endTime?: string,
   groupKey?: string,
+  attempt?: Pick<EventSeed, "attemptKey" | "attemptLabel" | "attemptStage">,
 ): EventSeed => ({
   id,
   type,
@@ -150,6 +154,7 @@ const exactEvent = (
   endAt: endDate && endTime ? atKst(endDate, endTime) : undefined,
   timePrecision: "exact",
   groupKey,
+  ...attempt,
 });
 
 type SeedOptions = Partial<Omit<ExamSeed, "id" | "name" | "category" | "source">>;
@@ -175,14 +180,26 @@ function seed(id: string, name: string, category: string, source: CatalogSource,
   };
 }
 
+const qnetTechnicalRound3Written = {
+  attemptKey: "qnet-technical-2026-r3-written",
+  attemptLabel: "2026년 기사·산업기사 3회 필기",
+  attemptStage: "written" as const,
+};
+
+const qnetTechnicalRound3Practical = {
+  attemptKey: "qnet-technical-2026-r3-practical",
+  attemptLabel: "2026년 기사·산업기사 3회 실기",
+  attemptStage: "practical" as const,
+};
+
 const qnetTechnicalRound3: EventSeed[] = [
-  exactEvent("r3-application", "application-open", "기사·산업기사 3회 원서접수", "2026-07-20", "10:00", "2026-07-23", "18:00", "qnet-tech-r3-application"),
-  exactEvent("r3-vacancy", "application-open", "기사·산업기사 3회 빈자리접수", "2026-08-01", "10:00", "2026-08-02", "18:00", "qnet-tech-r3-vacancy"),
-  dateEvent("r3-written", "exam", "기사·산업기사 3회 필기시험 기간", "2026-08-07", "2026-09-01", "qnet-tech-r3-written"),
-  dateEvent("r3-written-result", "result", "기사·산업기사 3회 필기 합격자 발표", "2026-09-09", undefined, "qnet-tech-r3-written-result"),
-  exactEvent("r3-practical-application-a", "application-open", "기사·산업기사 3회 실기 원서접수", "2026-09-21", "10:00", "2026-09-23", "18:00", "qnet-tech-r3-practical-application-a"),
-  exactEvent("r3-practical-application-b", "application-open", "기사·산업기사 3회 실기 추가 접수일", "2026-09-28", "10:00", "2026-09-28", "18:00", "qnet-tech-r3-practical-application-b"),
-  dateEvent("r3-practical", "exam", "기사·산업기사 3회 실기시험 기간", "2026-10-24", "2026-11-13", "qnet-tech-r3-practical"),
+  exactEvent("r3-application", "application-open", "기사·산업기사 3회 원서접수", "2026-07-20", "10:00", "2026-07-23", "18:00", "qnet-tech-r3-application", qnetTechnicalRound3Written),
+  exactEvent("r3-vacancy", "application-open", "기사·산업기사 3회 빈자리접수", "2026-08-01", "10:00", "2026-08-02", "18:00", "qnet-tech-r3-vacancy", qnetTechnicalRound3Written),
+  { ...dateEvent("r3-written", "exam", "기사·산업기사 3회 필기시험 기간", "2026-08-07", "2026-09-01", "qnet-tech-r3-written"), ...qnetTechnicalRound3Written },
+  { ...dateEvent("r3-written-result", "result", "기사·산업기사 3회 필기 합격자 발표", "2026-09-09", undefined, "qnet-tech-r3-written-result"), ...qnetTechnicalRound3Written },
+  exactEvent("r3-practical-application-a", "application-open", "기사·산업기사 3회 실기 원서접수", "2026-09-21", "10:00", "2026-09-23", "18:00", "qnet-tech-r3-practical-application-a", qnetTechnicalRound3Practical),
+  exactEvent("r3-practical-application-b", "application-open", "기사·산업기사 3회 실기 추가 접수일", "2026-09-28", "10:00", "2026-09-28", "18:00", "qnet-tech-r3-practical-application-b", qnetTechnicalRound3Practical),
+  { ...dateEvent("r3-practical", "exam", "기사·산업기사 3회 실기시험 기간", "2026-10-24", "2026-11-13", "qnet-tech-r3-practical"), ...qnetTechnicalRound3Practical },
 ];
 
 const qnetTechnicalSpecs = [

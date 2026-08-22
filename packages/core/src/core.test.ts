@@ -11,7 +11,10 @@ import {
   eventRelevantUntil,
   exams,
   getExam,
+  getExamAttempts,
   getHomeSummaryExams,
+  getAttemptEvents,
+  getNextAttemptEvent,
   getOfficialExamActions,
   getSameDayExamGroups,
   getUpcomingEventGroups,
@@ -37,7 +40,7 @@ describe("시험 카탈로그", () => {
       new Date(CATALOG_REVIEWED_AT).getTime(),
     );
 
-    expect(getExam("information-engineer")?.lastVerifiedAt).toBe("2026-07-24T14:30:00+09:00");
+    expect(getExam("information-engineer")?.lastVerifiedAt).toBe("2026-08-22T19:41:37+09:00");
     const professionalExam = exams.find((exam) => exam.sourceId === "qnet-professional-calendar-2026");
     expect(professionalExam?.lastVerifiedAt).toBe("2026-07-16T15:00:00+09:00");
   });
@@ -89,6 +92,33 @@ describe("시험 카탈로그", () => {
     const groups = getUpcomingEventGroups(new Date("2026-07-20T12:00:00+09:00"));
     const technicalRegistration = groups.find((item) => item.event.groupKey === "qnet-tech-r3-application");
     expect(technicalRegistration?.exams).toHaveLength(21);
+  });
+
+  it("명시적으로 검토한 Q-Net 회차·단계만 선택 가능한 일정으로 묶는다", () => {
+    const engineer = getExam("information-engineer");
+    if (!engineer) throw new Error("회차 선택 테스트용 시험이 없습니다.");
+    const attempts = getExamAttempts(engineer);
+    expect(attempts.map((attempt) => attempt.key)).toEqual([
+      "qnet-technical-2026-r3-written",
+      "qnet-technical-2026-r3-practical",
+    ]);
+    expect(getAttemptEvents(engineer, attempts[0]?.key).map((event) => event.type)).toEqual([
+      "application-open",
+      "application-open",
+      "exam",
+      "result",
+    ]);
+    expect(getAttemptEvents(engineer, attempts[1]?.key).every((event) => event.attemptStage === "practical")).toBe(true);
+    const history = getExam("history-advanced");
+    if (!history) throw new Error("회차 선택 제외 테스트용 시험이 없습니다.");
+    expect(getExamAttempts(history)).toEqual([]);
+  });
+
+  it("선택한 회차 밖의 다음 일정은 보여주지 않는다", () => {
+    const engineer = getExam("information-engineer");
+    if (!engineer) throw new Error("회차 다음 일정 테스트용 시험이 없습니다.");
+    const next = getNextAttemptEvent(engineer, "qnet-technical-2026-r3-practical", new Date("2026-09-10T12:00:00+09:00"));
+    expect(next?.id).toBe("information-engineer-r3-practical-application-a");
   });
 
   it("홈 요약 필터가 전체·현재 접수·14일 안 시험을 같은 판정 함수로 계산한다", () => {

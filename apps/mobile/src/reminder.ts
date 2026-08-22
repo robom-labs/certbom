@@ -54,8 +54,10 @@ export function createExamReminderPlans(
   daysBefore: ReminderDaysBefore,
   scope: ReminderScope,
   now = new Date(),
+  attemptKey?: string,
 ) {
   const events = [...exam.events]
+    .filter((event) => !attemptKey || event.attemptKey === attemptKey)
     .filter((event) => scope === "next" || CRITICAL_EVENT_TYPES.has(event.type))
     .sort((left, right) => left.startAt.localeCompare(right.startAt));
   const plans = events.flatMap((event) => {

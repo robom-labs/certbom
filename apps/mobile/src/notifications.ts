@@ -31,6 +31,7 @@ export type ScheduledExamReminder = {
   dedupeKey: string;
   notificationId: string;
   scope: ReminderScope;
+  attemptKey?: string;
 };
 
 export function configureNotificationPresentation() {
@@ -68,7 +69,8 @@ export async function getScheduledCertbomReminders(): Promise<ScheduledExamRemin
       : 1;
     const scope = notification.content.data?.scope === "critical" ? "critical" : "next";
     const channelVersion = Number(notification.content.data?.channelVersion ?? 1);
-    return [{ channelVersion, examId, daysBefore, dedupeKey, notificationId: notification.identifier, scope }];
+    const attemptKey = notification.content.data?.attemptKey;
+    return [{ channelVersion, examId, daysBefore, dedupeKey, notificationId: notification.identifier, scope, ...(typeof attemptKey === "string" ? { attemptKey } : {}) }];
   });
 }
 
@@ -82,11 +84,13 @@ async function ensureReminderChannel() {
   });
 }
 
-function reminderDedupeKey(examId: string, plan: ReminderPlan, scope: ReminderScope) {
-  return `certbom:${examId}:${plan.eventId ?? "official"}:${plan.daysBefore}d:${scope}:${plan.date.toISOString()}`;
+function reminderDedupeKey(examId: string, plan: ReminderPlan, scope: ReminderScope, attemptKey?: string) {
+  // 기존 전체 일정 알림의 식별자는 유지해 업데이트만으로 예약을 취소하지 않는다.
+  const attemptSegment = attemptKey ? `${attemptKey}:` : "";
+  return `certbom:${examId}:${attemptSegment}${plan.eventId ?? "official"}:${plan.daysBefore}d:${scope}:${plan.date.toISOString()}`;
 }
 
-async function schedulePlan(exam: Exam, plan: ReminderPlan, scope: ReminderScope) {
+async function schedulePlan(exam: Exam, plan: ReminderPlan, scope: ReminderScope, attemptKey?: string) {
   const trigger: Notifications.DateTriggerInput = {
     type: Notifications.SchedulableTriggerInputTypes.DATE,
     date: plan.date,
@@ -102,7 +106,8 @@ async function schedulePlan(exam: Exam, plan: ReminderPlan, scope: ReminderScope
         daysBefore: plan.daysBefore,
         channelVersion: REMINDER_CHANNEL_VERSION,
         scope,
-        dedupeKey: reminderDedupeKey(exam.id, plan, scope),
+        ...(attemptKey ? { attemptKey } : {}),
+        dedupeKey: reminderDedupeKey(exam.id, plan, scope, attemptKey),
       },
       sound: "default",
     },
@@ -114,9 +119,10 @@ export async function scheduleExamReminder(
   exam: Exam,
   daysBefore: ReminderDaysBefore = 1,
   scope: ReminderScope = "next",
+  attemptKey?: string,
 ): Promise<ReminderScheduleResult> {
   try {
-    const plans = createExamReminderPlans(exam, daysBefore, scope);
+    const plans = createExamReminderPlans(exam, daysBefore, scope, new Date(), attemptKey);
     if (!plans.length) {
       return {
         ok: false,
@@ -142,7 +148,7 @@ export async function scheduleExamReminder(
     }
 
     await cancelCertbomRemindersForExam(exam.id);
-    const notificationIds = await Promise.all(plans.map((plan) => schedulePlan(exam, plan, scope)));
+    const notificationIds = await Promise.all(plans.map((plan) => schedulePlan(exam, plan, scope, attemptKey)));
 
     return { ok: true, notificationIds, plans };
   } catch {
@@ -157,7 +163,7 @@ export async function scheduleExamReminder(
 // 앱 시작 때 과거·삭제된 일정 알림을 치우고 일정 변경된 관심 시험만 다시 예약합니다.
 export async function reconcileCertbomReminders(
   exams: readonly Exam[],
-  preferences?: readonly { examId: string; daysBefore: ReminderDaysBefore; scope: ReminderScope }[],
+  preferences?: readonly { examId: string; daysBefore: ReminderDaysBefore; scope: ReminderScope; attemptKey?: string }[],
 ): Promise<ScheduledExamReminder[]> {
   const scheduled = await getScheduledCertbomReminders();
   const byId = new Map(exams.map((exam) => [exam.id, exam]));
@@ -165,6 +171,7 @@ export async function reconcileCertbomReminders(
     examId: reminder.examId,
     daysBefore: reminder.daysBefore,
     scope: reminder.scope,
+    ...(reminder.attemptKey ? { attemptKey: reminder.attemptKey } : {}),
   }));
   const intended = new Map(requested.map((preference) => [preference.examId, preference]));
   const keep = new Set<string>();
@@ -173,7 +180,7 @@ export async function reconcileCertbomReminders(
     const exam = byId.get(reminder.examId);
     const preference = intended.get(reminder.examId);
     const expected = exam && preference
-      ? new Set(createExamReminderPlans(exam, preference.daysBefore, preference.scope).map((plan) => reminderDedupeKey(exam.id, plan, preference.scope)))
+      ? new Set(createExamReminderPlans(exam, preference.daysBefore, preference.scope, new Date(), preference.attemptKey).map((plan) => reminderDedupeKey(exam.id, plan, preference.scope, preference.attemptKey)))
       : new Set<string>();
     if (reminder.channelVersion !== REMINDER_CHANNEL_VERSION || !expected.has(reminder.dedupeKey) || keep.has(reminder.dedupeKey)) {
       await Notifications.cancelScheduledNotificationAsync(reminder.notificationId);
@@ -188,11 +195,11 @@ export async function reconcileCertbomReminders(
   for (const [examId, preference] of intended) {
     const exam = byId.get(examId);
     if (!exam) continue;
-    const plans = createExamReminderPlans(exam, preference.daysBefore, preference.scope);
+    const plans = createExamReminderPlans(exam, preference.daysBefore, preference.scope, new Date(), preference.attemptKey);
     for (const plan of plans) {
-      const key = reminderDedupeKey(exam.id, plan, preference.scope);
+      const key = reminderDedupeKey(exam.id, plan, preference.scope, preference.attemptKey);
       if (keep.has(key)) continue;
-      await schedulePlan(exam, plan, preference.scope);
+      await schedulePlan(exam, plan, preference.scope, preference.attemptKey);
       keep.add(key);
     }
   }

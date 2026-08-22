@@ -8,6 +8,7 @@ const REMINDER_EXAM_IDS_KEY = "certbom.mobile.reminderExamIds.v1";
 const REMINDER_PREFERENCES_KEY = "certbom.mobile.reminderPreferences.v1";
 const PREPARATION_CHECKED_IDS_KEY = "certbom.mobile.preparationCheckedIds.v1";
 const EXAM_JOURNEYS_KEY = "certbom.mobile.examJourneys.v1";
+const EXAM_ATTEMPT_SELECTIONS_KEY = "certbom.mobile.examAttemptSelections.v1";
 
 export type ExamJourneyStage = "watching" | "applied" | "took" | "result";
 
@@ -23,10 +24,16 @@ export type StoredExamJourney = {
   tasks: PersonalPreparationTask[];
 };
 
+export type StoredExamAttemptSelection = {
+  examId: string;
+  attemptKey: string;
+};
+
 export type StoredReminderPreference = {
   examId: string;
   daysBefore: 1 | 3 | 7;
   scope: "next" | "critical";
+  attemptKey?: string;
 };
 
 function normalizeIds(value: unknown) {
@@ -92,7 +99,13 @@ export async function loadReminderPreferences(): Promise<StoredReminderPreferenc
       if (typeof examId !== "string" || ![1, 3, 7].includes(Number(daysBefore))) return [];
       const rawScope = "scope" in item ? item.scope : undefined;
       const scope = rawScope === "critical" ? "critical" : "next";
-      return [{ examId, daysBefore: Number(daysBefore) as 1 | 3 | 7, scope }];
+      const attemptKey = "attemptKey" in item ? item.attemptKey : undefined;
+      return [{
+        examId,
+        daysBefore: Number(daysBefore) as 1 | 3 | 7,
+        scope,
+        ...(typeof attemptKey === "string" && attemptKey ? { attemptKey } : {}),
+      }];
     });
   } catch {
     return [];
@@ -103,9 +116,46 @@ export async function saveReminderPreferences(preferences: StoredReminderPrefere
   try {
     const normalized = [...new Map(preferences.map((preference) => [
       preference.examId,
-      { examId: preference.examId, daysBefore: preference.daysBefore, scope: preference.scope },
+      {
+        examId: preference.examId,
+        daysBefore: preference.daysBefore,
+        scope: preference.scope,
+        ...(preference.attemptKey ? { attemptKey: preference.attemptKey } : {}),
+      },
     ])).values()];
     await AsyncStorage.setItem(REMINDER_PREFERENCES_KEY, JSON.stringify(normalized));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function loadExamAttemptSelections(): Promise<StoredExamAttemptSelection[]> {
+  try {
+    const value = await AsyncStorage.getItem(EXAM_ATTEMPT_SELECTIONS_KEY);
+    if (!value) return [];
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const examId = "examId" in item ? item.examId : undefined;
+      const attemptKey = "attemptKey" in item ? item.attemptKey : undefined;
+      return typeof examId === "string" && typeof attemptKey === "string" && attemptKey
+        ? [{ examId, attemptKey }]
+        : [];
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function saveExamAttemptSelections(selections: StoredExamAttemptSelection[]) {
+  try {
+    const normalized = [...new Map(selections
+      .filter((selection) => selection.examId && selection.attemptKey)
+      .map((selection) => [selection.examId, { examId: selection.examId, attemptKey: selection.attemptKey }]))
+      .values()];
+    await AsyncStorage.setItem(EXAM_ATTEMPT_SELECTIONS_KEY, JSON.stringify(normalized));
     return true;
   } catch {
     return false;

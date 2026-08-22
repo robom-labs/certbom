@@ -5,8 +5,11 @@ import {
   catalogStats,
   createGoogleCalendarUrl,
   exams,
+  getAttemptEvents,
   getExam,
+  getExamAttempts,
   getHomeSummaryExams,
+  getNextAttemptEvent,
   getNextEvent,
   getOfficialExamActions,
   getUpcomingEvents,
@@ -51,17 +54,20 @@ import {
 import { createExamReminderPlans, type ReminderDaysBefore, type ReminderScope } from "./src/reminder";
 import {
   loadExamJourneys,
+  loadExamAttemptSelections,
   loadFavoriteExamIds,
   loadPreparationCheckedIds,
   loadReminderExamIds,
   loadReminderPreferences,
   saveExamJourneys,
+  saveExamAttemptSelections,
   saveFavoriteExamIds,
   savePreparationCheckedIds,
   saveReminderExamIds,
   saveReminderPreferences,
   saveSelectedExamId,
   type ExamJourneyStage,
+  type StoredExamAttemptSelection,
   type StoredExamJourney,
   type StoredReminderPreference,
 } from "./src/storage";
@@ -249,7 +255,8 @@ function ExamRow({ exam, favorite, onPress }: { exam: Exam; favorite: boolean; o
   );
 }
 
-function HomeScreen({ checkedPreparationIds, favoriteIds, journeys, onFind, onOpen, onSelectFilter, onShowReminders }: {
+function HomeScreen({ attemptSelections, checkedPreparationIds, favoriteIds, journeys, onFind, onOpen, onSelectFilter, onShowReminders }: {
+  attemptSelections: StoredExamAttemptSelection[];
   checkedPreparationIds: string[];
   favoriteIds: string[];
   journeys: StoredExamJourney[];
@@ -304,8 +311,10 @@ function HomeScreen({ checkedPreparationIds, favoriteIds, journeys, onFind, onOp
           const requiredIncomplete = required.filter((item) => !checkedPreparationIds.includes(item.id)).length;
           const completed = exam.preparation.filter((item) => checkedPreparationIds.includes(item.id)).length + journey.tasks.filter((task) => task.completed).length;
           const total = exam.preparation.length + journey.tasks.length;
-          const nextEvent = getNextEvent(exam);
-          return <Pressable key={exam.id} onPress={() => onOpen(exam)} style={({ pressed }) => [styles.journeyCard, pressed && styles.pressed]}><View style={styles.journeyCardTop}><View style={styles.journeyCardCopy}><Text numberOfLines={1} style={styles.journeyCardTitle}>{exam.name}</Text><Text style={styles.journeyCardStage}>{journeyStageLabel(journey.stage)}</Text></View><Text style={styles.journeyCardDday}>{nextEvent ? dDayLabel(nextEvent.startAt) : "일정 확인"}</Text></View><Text style={styles.journeyCardAction}>{journeyNextAction(exam, journey.stage, requiredIncomplete, journey.tasks)}</Text><View style={styles.journeyMiniProgress}><View style={[styles.journeyMiniProgressValue, { width: `${total ? Math.round((completed / total) * 100) : 0}%` }]} /></View><Text style={styles.journeyCardMeta}>준비 {completed}/{total} · 눌러서 계속하기</Text></Pressable>;
+          const attemptKey = attemptSelections.find((item) => item.examId === exam.id)?.attemptKey;
+          const selectedEvents = getAttemptEvents(exam, attemptKey);
+          const nextEvent = getNextAttemptEvent(exam, attemptKey);
+          return <Pressable key={exam.id} onPress={() => onOpen(exam)} style={({ pressed }) => [styles.journeyCard, pressed && styles.pressed]}><View style={styles.journeyCardTop}><View style={styles.journeyCardCopy}><Text numberOfLines={1} style={styles.journeyCardTitle}>{exam.name}</Text><Text style={styles.journeyCardStage}>{attemptKey ? `${journeyStageLabel(journey.stage)} · 선택 일정` : journeyStageLabel(journey.stage)}</Text></View><Text style={styles.journeyCardDday}>{nextEvent ? dDayLabel(nextEvent.startAt) : "일정 확인"}</Text></View><Text style={styles.journeyCardAction}>{journeyNextAction(exam, journey.stage, requiredIncomplete, journey.tasks, selectedEvents)}</Text><View style={styles.journeyMiniProgress}><View style={[styles.journeyMiniProgressValue, { width: `${total ? Math.round((completed / total) * 100) : 0}%` }]} /></View><Text style={styles.journeyCardMeta}>준비 {completed}/{total} · 눌러서 계속하기</Text></Pressable>;
         })}
       </>}
 
@@ -362,12 +371,15 @@ function FindScreen({ favoriteIds, initialFilter, onOpen }: { favoriteIds: strin
   );
 }
 
-function CalendarScreen({ favoriteIds, onOpen }: { favoriteIds: string[]; onOpen: (exam: Exam) => void }) {
+function CalendarScreen({ attemptSelections, favoriteIds, onOpen }: { attemptSelections: StoredExamAttemptSelection[]; favoriteIds: string[]; onOpen: (exam: Exam) => void }) {
   const layout = useCertbomLayout();
   const [month, setMonth] = useState(currentKstMonth);
   const [selectedDate, setSelectedDate] = useState(currentKstDateKey);
   const [savedOnly, setSavedOnly] = useState(false);
-  const events = useMemo(() => exams.flatMap((exam) => exam.events.map((event) => ({ exam, event }))).filter(({ exam }) => !savedOnly || favoriteIds.includes(exam.id)), [favoriteIds, savedOnly]);
+  const events = useMemo(() => exams.flatMap((exam) => {
+    const attemptKey = attemptSelections.find((item) => item.examId === exam.id)?.attemptKey;
+    return getAttemptEvents(exam, savedOnly && favoriteIds.includes(exam.id) ? attemptKey : undefined).map((event) => ({ exam, event }));
+  }).filter(({ exam }) => !savedOnly || favoriteIds.includes(exam.id)), [attemptSelections, favoriteIds, savedOnly]);
   const eventDates = useMemo(() => new Set(events.map(({ event }) => dateKey(event.startAt))), [events]);
   const selectedEvents = events.filter(({ event }) => dateKey(event.startAt) === selectedDate).sort((a, b) => a.event.startAt.localeCompare(b.event.startAt));
   const cells = monthCells(month).map((key, index) => ({ id: key ?? `leading-${month}-${index}`, key }));
@@ -390,7 +402,8 @@ function CalendarScreen({ favoriteIds, onOpen }: { favoriteIds: string[]; onOpen
   );
 }
 
-function RemindersScreen({ checkedPreparationIds, favoriteIds, journeys, preferences, scheduledCounts, notificationStatus, onEdit, onOpen, onOpenNotificationSettings }: {
+function RemindersScreen({ attemptSelections, checkedPreparationIds, favoriteIds, journeys, preferences, scheduledCounts, notificationStatus, onEdit, onOpen, onOpenNotificationSettings }: {
+  attemptSelections: StoredExamAttemptSelection[];
   checkedPreparationIds: string[];
   favoriteIds: string[];
   journeys: StoredExamJourney[];
@@ -414,8 +427,10 @@ function RemindersScreen({ checkedPreparationIds, favoriteIds, journeys, prefere
         const scheduledCount = scheduledCounts[exam.id] ?? 0;
         const journey = journeys.find((item) => item.examId === exam.id) ?? { examId: exam.id, stage: "watching" as const, tasks: [] };
         const requiredIncomplete = exam.preparation.filter((item) => item.importance === "required" && !checkedPreparationIds.includes(item.id)).length;
-        const nextEvent = getNextEvent(exam);
-        return <View key={exam.id} style={styles.reminderCard}><Pressable onPress={() => onOpen(exam)} style={styles.reminderCardCopy}><View style={styles.examNameRow}><Text style={styles.reminderExamName}>{exam.name}</Text><Text style={styles.favoriteBadge}>{journeyStageLabel(journey.stage)}</Text></View><Text style={styles.reminderExamAction}>{journeyNextAction(exam, journey.stage, requiredIncomplete, journey.tasks)}</Text><Text style={styles.reminderExamMeta}>{nextEvent ? formatDate(nextEvent.startAt, true) : "예약 가능한 미래 일정 없음"}</Text></Pressable><View style={[styles.reminderChip, scheduledCount > 0 && styles.reminderChipActive]}><Text style={[styles.reminderChipText, scheduledCount > 0 && styles.reminderChipTextActive]}>{scheduledCount > 0 && preference ? `${scheduledCount}개 알림` : "알림 꺼짐"}</Text></View><Pressable accessibilityLabel={`${exam.name} 알림 설정`} onPress={() => onEdit(exam)} style={styles.editButton}><Text style={styles.editButtonText}>설정</Text></Pressable></View>;
+        const attemptKey = attemptSelections.find((item) => item.examId === exam.id)?.attemptKey;
+        const selectedEvents = getAttemptEvents(exam, attemptKey);
+        const nextEvent = getNextAttemptEvent(exam, attemptKey);
+        return <View key={exam.id} style={styles.reminderCard}><Pressable onPress={() => onOpen(exam)} style={styles.reminderCardCopy}><View style={styles.examNameRow}><Text style={styles.reminderExamName}>{exam.name}</Text><Text style={styles.favoriteBadge}>{attemptKey ? "선택 일정" : journeyStageLabel(journey.stage)}</Text></View><Text style={styles.reminderExamAction}>{journeyNextAction(exam, journey.stage, requiredIncomplete, journey.tasks, selectedEvents)}</Text><Text style={styles.reminderExamMeta}>{nextEvent ? formatDate(nextEvent.startAt, true) : "예약 가능한 미래 일정 없음"}</Text></Pressable><View style={[styles.reminderChip, scheduledCount > 0 && styles.reminderChipActive]}><Text style={[styles.reminderChipText, scheduledCount > 0 && styles.reminderChipTextActive]}>{scheduledCount > 0 && preference ? `${scheduledCount}개 알림` : "알림 꺼짐"}</Text></View><Pressable accessibilityLabel={`${exam.name} 알림 설정`} onPress={() => onEdit(exam)} style={styles.editButton}><Text style={styles.editButtonText}>설정</Text></Pressable></View>;
       }) : <View style={styles.emptyCard}><Text style={styles.emptyTitle}>저장한 관심 시험이 없어요.</Text><Text style={styles.emptyText}>시험 찾기에서 관심 시험을 저장하면 여기서 알림 시점을 고를 수 있어요.</Text></View>}
     </ScrollView>
   );
@@ -439,7 +454,8 @@ function SettingsScreen({ notificationStatus, onOpenBatterySettings, onOpenNotif
   );
 }
 
-function DetailScreen({ checkedPreparationIds, exam, favorite, journey, reminder, onAddTask, onBack, onChangeStage, onDeleteTask, onEditReminder, onOpenUrl, onToggleFavorite, onTogglePreparation, onToggleTask }: {
+function DetailScreen({ attemptSelection, checkedPreparationIds, exam, favorite, journey, reminder, onAddTask, onBack, onChangeStage, onDeleteTask, onEditReminder, onOpenUrl, onSelectAttempt, onToggleFavorite, onTogglePreparation, onToggleTask }: {
+  attemptSelection?: StoredExamAttemptSelection;
   checkedPreparationIds: string[];
   exam: Exam;
   favorite: boolean;
@@ -451,13 +467,16 @@ function DetailScreen({ checkedPreparationIds, exam, favorite, journey, reminder
   onDeleteTask: (taskId: string) => void;
   onEditReminder: () => void;
   onOpenUrl: (url: string, label: string) => void;
+  onSelectAttempt: (attemptKey?: string) => void;
   onToggleFavorite: () => void;
   onTogglePreparation: (itemId: string) => void;
   onToggleTask: (taskId: string) => void;
 }) {
   const layout = useCertbomLayout();
   const [taskDraft, setTaskDraft] = useState("");
-  const next = getNextEvent(exam);
+  const attempts = getExamAttempts(exam);
+  const selectedEvents = getAttemptEvents(exam, attemptSelection?.attemptKey);
+  const next = getNextAttemptEvent(exam, attemptSelection?.attemptKey);
   const officialActions = getOfficialExamActions(exam);
   const applicationUrl = exam.applicationUrl;
   const checkedCount = exam.preparation.filter((item) => checkedPreparationIds.includes(item.id)).length;
@@ -474,13 +493,14 @@ function DetailScreen({ checkedPreparationIds, exam, favorite, journey, reminder
       <View style={styles.detailHeader}><Pressable accessibilityLabel="이전 화면" onPress={onBack} style={styles.backButton}><NativeIcon name="back" /></Pressable><Text numberOfLines={1} style={styles.detailHeaderTitle}>{exam.name}</Text><View style={styles.backButton} /></View>
       <ScrollView contentContainerStyle={[styles.detailContent, { maxWidth: layout.contentMaxWidth, paddingHorizontal: layout.horizontalPadding }]} showsVerticalScrollIndicator={false}>
         <View style={styles.detailHero}><Text style={styles.detailCategory}>{exam.category} · {exam.organizer}</Text><Text style={styles.detailTitle}>{exam.name}</Text><Text style={styles.detailDescription}>{exam.description}</Text><View style={styles.detailBadgeRow}><Text style={styles.detailBadge}>{isApplicationOpen(exam) ? "현재 접수 중" : "공식 일정 확인"}</Text><Text style={styles.detailBadge}>{exam.sourceName}</Text></View></View>
-        <View style={styles.nextEventCard}><Text style={styles.nextEventLabel}>다음 일정 {next ? `· ${dDayLabel(next.startAt)}` : ""}</Text><Text style={styles.nextEventTitle}>{next?.title ?? "공식 원문에서 확인"}</Text><Text style={styles.nextEventDate}>{next ? formatDate(next.startAt, true) : "확정된 미래 일정이 없어요."}</Text></View>
+        <View style={styles.nextEventCard}><Text style={styles.nextEventLabel}>{attemptSelection ? "선택한 회차의 다음 일정" : "다음 일정"} {next ? `· ${dDayLabel(next.startAt)}` : ""}</Text><Text style={styles.nextEventTitle}>{next?.title ?? "공식 원문에서 확인"}</Text><Text style={styles.nextEventDate}>{next ? formatDate(next.startAt, true) : "확정된 미래 일정이 없어요."}</Text></View>
         <View style={styles.detailActions}><Pressable onPress={onToggleFavorite} style={[styles.outlineButton, favorite && styles.outlineButtonActive]}><Text style={[styles.outlineButtonText, favorite && styles.outlineButtonTextActive]}>{favorite ? "관심 시험 저장됨" : "관심 시험에 저장"}</Text></Pressable><Pressable disabled={!next} onPress={onEditReminder} style={[styles.primaryButton, !next && styles.disabled]}><NativeIcon color="#ffffff" name="bell" size={20} /><Text style={styles.primaryButtonText}>{reminder ? `${reminder.daysBefore}일 전 알림 설정됨` : "알림 설정"}</Text></Pressable></View>
+        {attempts.length > 0 && <><SectionTitle eyebrow="이번에 준비하는 대상" title="회차와 단계 선택" /><View style={styles.infoCard}><NativeIcon color="#4058d8" name="calendar" /><View style={styles.infoCopy}><Text style={styles.infoTitle}>{favorite ? "내가 준비하는 일정만 먼저 볼 수 있어요." : "관심 시험에 저장한 뒤 회차를 고를 수 있어요."}</Text><Text style={styles.infoText}>공식 데이터에 명시된 회차·단계만 표시합니다. 선택하지 않으면 기존처럼 전체 일정을 보여줘요.</Text></View></View>{favorite && <View style={styles.stageRow}>{attempts.map((attempt) => <Pressable accessibilityState={{ selected: attemptSelection?.attemptKey === attempt.key }} key={attempt.key} onPress={() => onSelectAttempt(attempt.key)} style={[styles.stageChip, attemptSelection?.attemptKey === attempt.key && styles.stageChipActive]}><Text style={[styles.stageChipText, attemptSelection?.attemptKey === attempt.key && styles.stageChipTextActive]}>{attempt.label}</Text></Pressable>)}</View>}{favorite && attemptSelection && <Pressable onPress={() => onSelectAttempt(undefined)} style={styles.outlineButton}><Text style={styles.outlineButtonText}>전체 일정 보기</Text></Pressable>}</>}
         <SectionTitle eyebrow="한 단계씩 준비하기" title="내 시험 진행" />
         <View style={styles.stageRow}>{journeyStages.map((stage) => <Pressable accessibilityState={{ selected: journey.stage === stage.id }} key={stage.id} onPress={() => onChangeStage(stage.id)} style={[styles.stageChip, journey.stage === stage.id && styles.stageChipActive]}><Text style={[styles.stageChipText, journey.stage === stage.id && styles.stageChipTextActive]}>{stage.label}</Text></Pressable>)}</View>
-        <View style={styles.nextActionCard}><Text style={styles.nextActionLabel}>지금 할 일</Text><Text style={styles.nextActionTitle}>{journeyNextAction(exam, journey.stage, requiredIncomplete, journey.tasks)}</Text></View>
-        <SectionTitle count={exam.events.length} eyebrow="공식 출처 기준" title="주요 일정" />
-        {exam.events.slice().sort((a, b) => a.startAt.localeCompare(b.startAt)).map((event) => <View key={event.id} style={styles.detailEventRow}><View style={[styles.detailEventDot, { backgroundColor: eventAccent(event.type) }]} /><View style={styles.detailEventCopy}><Text style={styles.detailEventType}>{eventLabels[event.type]}</Text><Text style={styles.detailEventTitle}>{event.title}</Text><Text style={styles.detailEventDate}>{formatDate(event.startAt, true)}</Text></View></View>)}
+        <View style={styles.nextActionCard}><Text style={styles.nextActionLabel}>지금 할 일</Text><Text style={styles.nextActionTitle}>{journeyNextAction(exam, journey.stage, requiredIncomplete, journey.tasks, selectedEvents)}</Text></View>
+        <SectionTitle count={selectedEvents.length} eyebrow="공식 출처 기준" title={attemptSelection ? "선택한 일정" : "주요 일정"} />
+        {selectedEvents.slice().sort((a, b) => a.startAt.localeCompare(b.startAt)).map((event) => <View key={event.id} style={styles.detailEventRow}><View style={[styles.detailEventDot, { backgroundColor: eventAccent(event.type) }]} /><View style={styles.detailEventCopy}><Text style={styles.detailEventType}>{eventLabels[event.type]}</Text><Text style={styles.detailEventTitle}>{event.title}</Text><Text style={styles.detailEventDate}>{formatDate(event.startAt, true)}</Text></View></View>)}
         {next && <Pressable onPress={() => onOpenUrl(createGoogleCalendarUrl(exam, next), "Google 캘린더")} style={styles.outlineButton}><Text style={styles.outlineButtonText}>다음 일정을 Google 캘린더에 추가</Text><NativeIcon color="#4058d8" name="external" size={18} /></Pressable>}
         <SectionTitle count={exam.preparation.length} eyebrow="시험 전 확인" title="준비물과 주의사항" />
         <View accessibilityLabel={`준비물 ${exam.preparation.length}개 중 ${checkedCount}개 완료`} accessibilityRole="summary" style={styles.preparationProgress}><View style={styles.preparationProgressCopy}><Text style={styles.preparationProgressTitle}>준비 {checkedCount}/{exam.preparation.length}</Text><Text style={styles.preparationProgressMeta}>필수 미완료 {requiredIncomplete}개</Text></View><View style={styles.preparationProgressTrack}><View style={[styles.preparationProgressValue, { width: `${exam.preparation.length ? Math.round((checkedCount / exam.preparation.length) * 100) : 0}%` }]} /></View></View>
@@ -499,7 +519,8 @@ function DetailScreen({ checkedPreparationIds, exam, favorite, journey, reminder
   );
 }
 
-function ReminderEditor({ exam, existing, onCancel, onRemove, onSave, saving }: {
+function ReminderEditor({ attemptKey, exam, existing, onCancel, onRemove, onSave, saving }: {
+  attemptKey?: string;
   exam: Exam;
   existing?: StoredReminderPreference;
   onCancel: () => void;
@@ -510,7 +531,7 @@ function ReminderEditor({ exam, existing, onCancel, onRemove, onSave, saving }: 
   const layout = useCertbomLayout();
   const [daysBefore, setDaysBefore] = useState<ReminderDaysBefore>(existing?.daysBefore ?? 1);
   const [scope, setScope] = useState<ReminderScope>(existing?.scope ?? "next");
-  const firstPlan = createExamReminderPlans(exam, daysBefore, scope)[0];
+  const firstPlan = createExamReminderPlans(exam, daysBefore, scope, new Date(), attemptKey)[0];
   const next = exam.events.find((event) => event.id === firstPlan?.eventId);
   return (
     <Modal animationType="slide" onRequestClose={onCancel} transparent visible>
@@ -551,6 +572,7 @@ function MobileApp() {
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [checkedPreparationIds, setCheckedPreparationIds] = useState<string[]>([]);
   const [journeys, setJourneys] = useState<StoredExamJourney[]>([]);
+  const [attemptSelections, setAttemptSelections] = useState<StoredExamAttemptSelection[]>([]);
   const [preferences, setPreferences] = useState<StoredReminderPreference[]>([]);
   const [scheduledCounts, setScheduledCounts] = useState<Record<string, number>>({});
   const [notificationStatus, setNotificationStatus] = useState<Notifications.PermissionStatus | "unknown">("unknown");
@@ -569,27 +591,34 @@ function MobileApp() {
   useEffect(() => {
     configureNotificationPresentation();
     void (async () => {
-      const [storedFavorites, legacyIntent, storedPreferences, storedPreparationIds, storedJourneys, scheduled] = await Promise.all([
+      const [storedFavorites, legacyIntent, storedPreferences, storedPreparationIds, storedJourneys, storedAttemptSelections, scheduled] = await Promise.all([
         loadFavoriteExamIds(),
         loadReminderExamIds(),
         loadReminderPreferences(),
         loadPreparationCheckedIds(),
         loadExamJourneys(),
+        loadExamAttemptSelections(),
         getScheduledCertbomReminders(),
       ]);
       const validFavorites = storedFavorites.filter((id) => Boolean(getExam(id)));
       const validJourneys = storedJourneys.filter((item) => Boolean(getExam(item.examId)));
+      const validAttemptSelections = storedAttemptSelections.filter((selection) => {
+        const exam = getExam(selection.examId);
+        return Boolean(exam && getExamAttempts(exam).some((attempt) => attempt.key === selection.attemptKey));
+      });
       const storedById = new Map(storedPreferences.map((item) => [item.examId, item]));
       for (const item of scheduled) if (!storedById.has(item.examId)) storedById.set(item.examId, { examId: item.examId, daysBefore: item.daysBefore, scope: item.scope });
       for (const id of legacyIntent.examIds) if (!storedById.has(id)) storedById.set(id, { examId: id, daysBefore: 1, scope: "next" });
       const validPreferences = [...storedById.values()].filter((item) => Boolean(getExam(item.examId)));
       setFavoriteIds(validFavorites);
       setJourneys(validJourneys);
+      setAttemptSelections(validAttemptSelections);
       setPreferences(validPreferences);
       setCheckedPreparationIds(storedPreparationIds);
       await Promise.all([
         saveFavoriteExamIds(validFavorites),
         saveExamJourneys(validJourneys),
+        saveExamAttemptSelections(validAttemptSelections),
         saveReminderExamIds(validPreferences.map((item) => item.examId)),
         saveReminderPreferences(validPreferences),
         savePreparationCheckedIds(storedPreparationIds),
@@ -681,14 +710,15 @@ function MobileApp() {
 
   const saveReminder = async (exam: Exam, daysBefore: ReminderDaysBefore, scope: ReminderScope) => {
     setSavingReminder(true);
-    const result = await scheduleExamReminder(exam, daysBefore, scope);
+    const attemptKey = attemptSelections.find((item) => item.examId === exam.id)?.attemptKey;
+    const result = await scheduleExamReminder(exam, daysBefore, scope, attemptKey);
     if (!result.ok) {
       setSavingReminder(false);
       Alert.alert("알림을 예약하지 못했어요", result.message);
       await refreshNotificationStatus();
       return;
     }
-    const nextPreferences = [...preferences.filter((item) => item.examId !== exam.id), { examId: exam.id, daysBefore, scope }];
+    const nextPreferences = [...preferences.filter((item) => item.examId !== exam.id), { examId: exam.id, daysBefore, scope, ...(attemptKey ? { attemptKey } : {}) }];
     const saved = await Promise.all([
       saveReminderPreferences(nextPreferences),
       saveReminderExamIds(nextPreferences.map((item) => item.examId)),
@@ -710,6 +740,21 @@ function MobileApp() {
     setEditorExamId(undefined);
     const firstPlan = result.plans[0];
     Alert.alert("알림을 예약했어요", scope === "critical" ? `중요 일정 ${result.plans.length}개를 각각 ${daysBefore}일 전에 알려드릴게요.` : `${firstPlan?.eventTitle ?? "다음 일정"}을 ${firstPlan ? formatReminderDate(firstPlan.date) : `${daysBefore}일 전`}에 알려드릴게요.`);
+  };
+
+  const selectAttempt = async (exam: Exam, attemptKey?: string) => {
+    const next = attemptKey
+      ? [...attemptSelections.filter((item) => item.examId !== exam.id), { examId: exam.id, attemptKey }]
+      : attemptSelections.filter((item) => item.examId !== exam.id);
+    if (!(await saveExamAttemptSelections(next))) {
+      Alert.alert("선택한 일정을 저장하지 못했어요", "기기 저장소를 확인한 뒤 다시 시도해 주세요.");
+      return;
+    }
+    setAttemptSelections(next);
+    const preference = preferences.find((item) => item.examId === exam.id);
+    if (preference && preference.attemptKey !== attemptKey) {
+      Alert.alert("선택한 일정으로 저장했어요", "기존 알림은 그대로 유지됩니다. 선택한 일정 알림으로 바꾸려면 알림 설정을 다시 저장해 주세요.");
+    }
   };
 
   const removeReminder = async (exam: Exam) => {
@@ -771,8 +816,8 @@ function MobileApp() {
     : undefined;
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={styles.safeArea}>
-      {detailExam && detailJourney ? <DetailScreen checkedPreparationIds={checkedPreparationIds} exam={detailExam} favorite={favoriteIds.includes(detailExam.id)} journey={detailJourney} onAddTask={(label) => void addJourneyTask(detailExam, label)} onBack={() => setDetailExamId(undefined)} onChangeStage={(stage) => void changeJourneyStage(detailExam, stage)} onDeleteTask={(taskId) => void deleteJourneyTask(detailExam, taskId)} onEditReminder={() => setEditorExamId(detailExam.id)} onOpenUrl={openUrl} onToggleFavorite={() => void toggleFavorite(detailExam)} onTogglePreparation={(itemId) => void togglePreparation(itemId)} onToggleTask={(taskId) => void toggleJourneyTask(detailExam, taskId)} reminder={preferences.find((item) => item.examId === detailExam.id)} /> : <><BrandHeader compact={activeTab !== "home"} onOpenRobom={() => void openUrl(ROBOM_URL, "로봄 홈페이지")} /><View style={styles.content}>{activeTab === "home" && <HomeScreen checkedPreparationIds={checkedPreparationIds} favoriteIds={favoriteIds} journeys={journeys} onFind={() => changeTab("find")} onOpen={openExam} onSelectFilter={(filter) => { setFindFilter(filter); changeTab("find"); }} onShowReminders={() => changeTab("reminders")} />}{activeTab === "find" && <FindScreen favoriteIds={favoriteIds} initialFilter={findFilter} onOpen={openExam} />}{activeTab === "calendar" && <CalendarScreen favoriteIds={favoriteIds} onOpen={openExam} />}{activeTab === "reminders" && <RemindersScreen checkedPreparationIds={checkedPreparationIds} favoriteIds={favoriteIds} journeys={journeys} notificationStatus={notificationStatus} onEdit={(exam) => setEditorExamId(exam.id)} onOpen={openExam} onOpenNotificationSettings={() => void openNotificationSettings()} preferences={preferences} scheduledCounts={scheduledCounts} />}{activeTab === "settings" && <SettingsScreen notificationStatus={notificationStatus} onOpenBatterySettings={() => void openBatterySettings()} onOpenNotificationSettings={() => void openNotificationSettings()} onOpenUrl={openUrl} />}</View><BottomTabs active={activeTab} onChange={changeTab} /></>}
-      {editorExam && <ReminderEditor exam={editorExam} existing={preferences.find((item) => item.examId === editorExam.id)} onCancel={() => setEditorExamId(undefined)} onRemove={() => void removeReminder(editorExam)} onSave={(days, scope) => void saveReminder(editorExam, days, scope)} saving={savingReminder} />}
+      {detailExam && detailJourney ? <DetailScreen attemptSelection={attemptSelections.find((item) => item.examId === detailExam.id)} checkedPreparationIds={checkedPreparationIds} exam={detailExam} favorite={favoriteIds.includes(detailExam.id)} journey={detailJourney} onAddTask={(label) => void addJourneyTask(detailExam, label)} onBack={() => setDetailExamId(undefined)} onChangeStage={(stage) => void changeJourneyStage(detailExam, stage)} onDeleteTask={(taskId) => void deleteJourneyTask(detailExam, taskId)} onEditReminder={() => setEditorExamId(detailExam.id)} onOpenUrl={openUrl} onSelectAttempt={(attemptKey) => void selectAttempt(detailExam, attemptKey)} onToggleFavorite={() => void toggleFavorite(detailExam)} onTogglePreparation={(itemId) => void togglePreparation(itemId)} onToggleTask={(taskId) => void toggleJourneyTask(detailExam, taskId)} reminder={preferences.find((item) => item.examId === detailExam.id)} /> : <><BrandHeader compact={activeTab !== "home"} onOpenRobom={() => void openUrl(ROBOM_URL, "로봄 홈페이지")} /><View style={styles.content}>{activeTab === "home" && <HomeScreen attemptSelections={attemptSelections} checkedPreparationIds={checkedPreparationIds} favoriteIds={favoriteIds} journeys={journeys} onFind={() => changeTab("find")} onOpen={openExam} onSelectFilter={(filter) => { setFindFilter(filter); changeTab("find"); }} onShowReminders={() => changeTab("reminders")} />}{activeTab === "find" && <FindScreen favoriteIds={favoriteIds} initialFilter={findFilter} onOpen={openExam} />}{activeTab === "calendar" && <CalendarScreen attemptSelections={attemptSelections} favoriteIds={favoriteIds} onOpen={openExam} />}{activeTab === "reminders" && <RemindersScreen attemptSelections={attemptSelections} checkedPreparationIds={checkedPreparationIds} favoriteIds={favoriteIds} journeys={journeys} notificationStatus={notificationStatus} onEdit={(exam) => setEditorExamId(exam.id)} onOpen={openExam} onOpenNotificationSettings={() => void openNotificationSettings()} preferences={preferences} scheduledCounts={scheduledCounts} />}{activeTab === "settings" && <SettingsScreen notificationStatus={notificationStatus} onOpenBatterySettings={() => void openBatterySettings()} onOpenNotificationSettings={() => void openNotificationSettings()} onOpenUrl={openUrl} />}</View><BottomTabs active={activeTab} onChange={changeTab} /></>}
+      {editorExam && <ReminderEditor attemptKey={attemptSelections.find((item) => item.examId === editorExam.id)?.attemptKey} exam={editorExam} existing={preferences.find((item) => item.examId === editorExam.id)} onCancel={() => setEditorExamId(undefined)} onRemove={() => void removeReminder(editorExam)} onSave={(days, scope) => void saveReminder(editorExam, days, scope)} saving={savingReminder} />}
     </SafeAreaView>
   );
 }
