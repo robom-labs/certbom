@@ -1,7 +1,7 @@
 <!-- 자격증봄 프로덕션 출시의 검증 증거와 재개 지점을 기록하는 진행 원장이다. -->
 # 자격증봄 프로덕션 출시 진행 원장
 
-마지막 갱신은 2026-08-09 18:16 KST다.
+마지막 갱신은 2026-08-22 19:20 KST다.
 
 ## 절대 완료 조건
 
@@ -17,6 +17,12 @@
 ## 현재 상태
 
 - Play Console 앱은 `자격증봄`, package는 `kr.robom.certbom`이다.
+- 현재 일반 사용자에게 공개된 릴리스는 versionName `0.9.0`, versionCode `16`이며 2026-08-11 23:45 KST에 100% 프로덕션 배포를 확인했다.
+- 공개 AAB는 `/Users/runner706/Documents/Codex/2026-07-11/02/work/release-archives/certbom-0.9.0-v16-pending/certbom-0.9.0-v16.aab`이고 SHA-256은 `c1133062254ca70bab7f1119912aed67f8a704aa510ecb3d5e2df8e986de02d4`이다.
+- 공개 제품 소스 SHA는 `8cebe2ba9414717b2162329efcae2565e5aff7fd`다. 이 커밋의 `apps/mobile/app.json`은 package `kr.robom.certbom`, version `0.9.0`, Android versionCode `16`을 선언한다.
+- 다음 Google Play 업데이트는 versionCode `17` 이상으로 새 AAB를 만들어야 한다. 공개 versionCode `16` AAB는 재사용하지 않는다.
+- 공개 모니터 자동화는 다음 버전 제출이 명시적으로 시작될 때까지 중지한다. 수동 실행 경로만 유지한다.
+- 아래 `0.8.4` 기록은 이전 공개 이력으로 보존하며, 현재 공개 상태를 뜻하지 않는다.
 - 프로덕션 릴리스 `0.8.4 정식 출시`를 2026-08-09에 Google 검토로 전송했다.
 - 제출 버전은 versionName `0.8.4`, versionCode `14`다.
 - 공개 지역 변경은 대한민국 1개 국가 추가다.
@@ -36,7 +42,7 @@
 - 최신 GitHub CI와 Family contract가 모두 성공했다.
 - production tag `certbom-v0.8.4-production`을 실제 제출 소스 SHA `5564dda1869dde7cd8f64e183cd2a1a061fb3b4b`에 생성해 GitHub에 push했다.
 
-## 최종 AAB
+## 0.8.4 공개 이력의 AAB
 
 - 로컬 경로는 `/Users/runner706/Documents/Codex/2026-07-11/02/releases/certbom/0.8.4-v14/certbom-0.8.4-v14.aab`다.
 - SHA-256은 `90d142ed7ce4f8df3c46289b597c3f06c20b6d131ba512b8fe634beeb06388bf`다.
@@ -45,14 +51,14 @@
 - 기존 EAS 원격 업로드 키를 사용했고 package와 Play App Signing 체계는 변경하지 않았다.
 - Bundletool 검증과 16KB 페이지 정렬 검증을 통과했다.
 
-## 출시 직전 수정
+## 0.8.4 출시 직전 수정
 
 - Android versionCode를 14로 증가했다.
 - 사용하지 않는 `SYSTEM_ALERT_WINDOW`, `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE` 권한을 차단했다.
 - 위 권한이 다시 포함되면 설정 검증이 실패하도록 검사를 추가했다.
 - package, 서명키, 로그인, 결제, 광고, 분석, 추적 기능은 변경하지 않았다.
 
-## 검증 증거
+## 0.8.4 공개 검증 증거
 
 - frozen dependency install 통과.
 - ESLint 89개 파일 통과.
@@ -70,7 +76,7 @@
 - 일반 사용자용 Google Play Store 페이지, 앱 이름, 개발자, 설치 버튼, 업데이트 날짜, 스크린샷, 설명, Data safety, 콘텐츠 등급, 지원 영역을 확인했다.
 - 연결된 `Samsung SM-S937N`에 Play Store 설치 요청을 전송했다. 기기 자체 실행 검증은 이 Mac에 ADB가 없어 별도 증거를 확보하지 못했다.
 
-## 백업
+## 0.8.4 공개 이력 백업
 
 - 외장 최종 백업은 `/Volumes/One Touch/Robom-Bom-Projects-2026-08-02/02-production/certbom/0.8.4-v14/`다.
 - 위 폴더에 AAB, 전체 Git history bundle, 공개 메타데이터와 해시를 보관하고 무결성을 확인한다.
@@ -80,9 +86,9 @@
 
 - 공개 상태는 Google Play Production 게시 완료다.
 - package는 `kr.robom.certbom`이다.
-- 공개 버전은 versionName `0.8.4`, versionCode `14`, targetSdk `36`이다.
+- 공개 버전은 versionName `0.9.0`, versionCode `16`, targetSdk `36`이다.
 - Play Store 주소는 `https://play.google.com/store/apps/details?id=kr.robom.certbom`이다.
-- 공개 소스 tag는 `certbom-v0.8.4-production`이다.
+- 공개 제품 소스는 `8cebe2ba9414717b2162329efcae2565e5aff7fd`다.
 - 출시 후 심각한 Play Console 정책 오류나 게시 차단은 확인되지 않았다.
 
 ## 현재 사용자 조치
