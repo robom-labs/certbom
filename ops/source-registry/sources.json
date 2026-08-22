@@ -1,6 +1,6 @@
 {
   "schemaVersion": 3,
-  "dataVersion": "2026.07.24-v4",
+  "dataVersion": "2026.08.22-kpc-v1",
   "lastReviewedAt": "2026-07-24T14:30:00+09:00",
   "automation": {
     "qnetSchedule": {
@@ -113,7 +113,7 @@
       "v1포함": true,
       "officialUrl": "https://license.kpc.or.kr/nasec/rceptexmncnfirm/orgrcept/selectItemfx.do",
       "applicationUrl": "https://license.kpc.or.kr/index.do?gubun=main30",
-      "lastVerifiedAt": "2026-07-16T15:00:00+09:00",
+      "lastVerifiedAt": "2026-08-22T23:56:47+09:00",
       "parserVersion": "kpc-manual-v1",
       "freshnessSloHours": 24,
       "staleAfterHours": 48,

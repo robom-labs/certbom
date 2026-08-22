@@ -29,7 +29,7 @@ import {
 
 describe("시험 카탈로그", () => {
   it("카탈로그 검토 시각과 출처 연결 점검 시각을 구분한다", () => {
-    expect(CATALOG_DATA_VERSION).toBe("2026.07.24-v4");
+    expect(CATALOG_DATA_VERSION).toBe("2026.08.22-kpc-v1");
     expect(CATALOG_REVIEWED_AT).toBe("2026-07-24T14:30:00+09:00");
     expect(SOURCE_CONNECTION_STATUS.totalCount).toBe(8);
     expect(SOURCE_CONNECTION_STATUS.healthyCount).toBeGreaterThanOrEqual(0);
@@ -131,6 +131,29 @@ describe("시험 카탈로그", () => {
     expect(events.length).toBeGreaterThan(0);
     expect(events.every((event) => eventRelevantUntil(event) >= now.getTime())).toBe(true);
     expect(events.some((event) => event.startAt.startsWith("2026-07-"))).toBe(false);
+  });
+
+  it("현재 공식 KPC 접수 화면의 다음 회차만 노출한다", () => {
+    const now = new Date("2026-08-22T12:00:00+09:00");
+    const gtq = getExam("gtq");
+    const itq = getExam("itq");
+    const smat = getExam("smat");
+    if (!gtq || !itq || !smat) throw new Error("KPC 일정 테스트용 시험을 찾지 못했습니다.");
+
+    expect(getUpcomingAttemptEvents(gtq, undefined, now).map((event) => event.id)).toEqual([
+      "gtq-9-application",
+      "gtq-9-exam",
+      "gtq-10-application",
+      "gtq-10-exam",
+    ]);
+    expect(getUpcomingAttemptEvents(itq, undefined, now).map((event) => event.id)).toEqual([
+      "itq-application",
+      "itq-exam",
+    ]);
+    expect(getUpcomingAttemptEvents(smat, undefined, now).map((event) => event.id)).toEqual([
+      "smat-application",
+      "smat-exam",
+    ]);
   });
 
   it("홈 요약 필터가 전체·현재 접수·14일 안 시험을 같은 판정 함수로 계산한다", () => {

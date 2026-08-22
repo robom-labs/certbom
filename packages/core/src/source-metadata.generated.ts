@@ -1,6 +1,6 @@
 // 공식 출처 장부에서 자동 생성한 데이터 확인 시각과 연결 상태를 제공한다.
 // 이 파일은 scripts/generate-source-metadata.mjs로 생성하므로 직접 수정하지 않는다.
-export const CATALOG_DATA_VERSION = "2026.07.24-v4";
+export const CATALOG_DATA_VERSION = "2026.08.22-kpc-v1";
 export const CATALOG_REVIEWED_AT = "2026-07-24T14:30:00+09:00";
 
 export const SOURCE_REVIEWED_AT = {
@@ -8,7 +8,7 @@ export const SOURCE_REVIEWED_AT = {
   "qnet-professional-calendar-2026": "2026-07-16T15:00:00+09:00",
   "historyexam-schedule-2026": "2026-07-24T14:30:00+09:00",
   "kdata-calendar-2026": "2026-07-24T14:30:00+09:00",
-  "kpc-current-registration-2026": "2026-07-16T15:00:00+09:00",
+  "kpc-current-registration-2026": "2026-08-22T23:56:47+09:00",
   "at-calendar-2026": "2026-07-24T14:30:00+09:00",
   "korcham-calendar-2026": "2026-07-16T15:00:00+09:00",
   "gosi-announcement-2026": "2026-07-16T15:00:00+09:00"
@@ -23,8 +23,8 @@ export const SOURCE_CONNECTION_STATUS = {
 
 export const SOURCE_FRESHNESS_STATUS = {
   "checkedAt": "2026-08-22T10:41:37.478Z",
-  "freshCount": 1,
-  "staleCount": 7,
+  "freshCount": 2,
+  "staleCount": 6,
   "totalCount": 8,
   "staleSourceIds": [
     "at-calendar-2026",
@@ -32,7 +32,6 @@ export const SOURCE_FRESHNESS_STATUS = {
     "historyexam-schedule-2026",
     "kdata-calendar-2026",
     "korcham-calendar-2026",
-    "kpc-current-registration-2026",
     "qnet-professional-calendar-2026"
   ],
   "sources": [
@@ -70,11 +69,11 @@ export const SOURCE_FRESHNESS_STATUS = {
     },
     {
       "sourceId": "kpc-current-registration-2026",
-      "lastReviewedAt": "2026-07-16T15:00:00+09:00",
-      "ageHours": 892,
+      "lastReviewedAt": "2026-08-22T23:56:47+09:00",
+      "ageHours": 0,
       "staleAfterHours": 48,
-      "staleAt": "2026-07-18T06:00:00.000Z",
-      "state": "stale"
+      "staleAt": "2026-08-24T14:56:47.000Z",
+      "state": "fresh"
     },
     {
       "sourceId": "at-calendar-2026",

@@ -511,36 +511,39 @@ const kdataExams = kdataSpecs.map(([id, name, aliases]) => seed(id, name, "IT·�
 
 const kpcShared = {
   gtq: [
-    dateEvent("application", "application-open", "GTQ 정기시험 원서접수", "2026-07-22", "2026-07-29", "kpc-gtq-application"),
-    dateEvent("exam", "exam", "GTQ 정기시험", "2026-08-22", undefined, "kpc-gtq-exam"),
+    dateEvent("9-application", "application-open", "제9회 GTQ 정기시험 원서접수", "2026-08-19", "2026-08-26", "kpc-gtq-9-application"),
+    dateEvent("9-exam", "exam", "제9회 GTQ 정기시험", "2026-09-19", undefined, "kpc-gtq-9-exam"),
+    dateEvent("10-application", "application-open", "제10회 GTQ 정기시험 원서접수", "2026-09-23", "2026-09-30", "kpc-gtq-10-application"),
+    dateEvent("10-exam", "exam", "제10회 GTQ 정기시험", "2026-10-24", undefined, "kpc-gtq-10-exam"),
   ],
-  september: [
-    dateEvent("application", "application-open", "9월 정기시험 원서접수", "2026-08-06", "2026-08-12", "kpc-september-application"),
-    dateEvent("exam", "exam", "9월 정기시험", "2026-09-12", undefined, "kpc-september-exam"),
+  gtqid: [
+    dateEvent("9-application", "application-open", "제9회 GTQid 정기시험 원서접수", "2026-08-19", "2026-08-26", "kpc-gtqid-9-application"),
+    dateEvent("9-exam", "exam", "제9회 GTQid 정기시험", "2026-09-19", undefined, "kpc-gtqid-9-exam"),
+  ],
+  october: [
+    dateEvent("application", "application-open", "제10회 정기시험 원서접수", "2026-09-10", "2026-09-16", "kpc-october-application"),
+    dateEvent("exam", "exam", "제10회 정기시험", "2026-10-17", undefined, "kpc-october-exam"),
   ],
 };
 
 const kpcExams = [
   seed("itq", "ITQ 정보기술자격", "사무·IT", catalogSources.kpc, {
     aliases: ["ITQ", "아이티큐", "ITQ 한글", "ITQ 엑셀"], duration: "short", practical: true,
-    events: [
-      dateEvent("special-application", "application-open", "ITQ 특별시험 원서접수", "2026-07-16", "2026-07-22"),
-      dateEvent("special-exam", "exam", "ITQ 특별시험", "2026-08-23"),
-      ...kpcShared.september,
-    ],
+    events: kpcShared.october,
   }),
   seed("gtq", "GTQ 그래픽기술자격", "디자인·IT", catalogSources.kpc, { aliases: ["GTQ", "포토샵 자격증"], duration: "short", practical: true, events: kpcShared.gtq }),
   seed("gtqi", "GTQi 그래픽기술자격", "디자인·IT", catalogSources.kpc, { aliases: ["GTQi", "일러스트 자격증"], duration: "short", practical: true, events: kpcShared.gtq }),
-  seed("gtqid", "GTQid 그래픽기술자격", "디자인·IT", catalogSources.kpc, { aliases: ["GTQid", "인디자인 자격증"], duration: "short", practical: true, events: kpcShared.gtq }),
+  seed("gtqid", "GTQid 그래픽기술자격", "디자인·IT", catalogSources.kpc, { aliases: ["GTQid", "인디자인 자격증"], duration: "short", practical: true, events: kpcShared.gtqid }),
   seed("erp-manager", "ERP정보관리사", "사무·경영", catalogSources.kpc, {
     aliases: ["ERP 정보관리사", "ERP 회계", "ERP 인사"], practical: true,
     events: [dateEvent("application", "application-open", "ERP 정기시험 원서접수", "2026-08-19", "2026-08-26"), dateEvent("exam", "exam", "ERP 정기시험", "2026-09-19")],
   }),
-  seed("aibt", "AIBT 인공지능 비즈니스 활용능력", "AI·업무", catalogSources.kpc, { aliases: ["AIBT"], duration: "short", events: kpcShared.september }),
-  seed("cat", "CAT 캐드실무능력평가", "설계·IT", catalogSources.kpc, { aliases: ["CAT", "캐드 자격증"], duration: "short", practical: true, events: kpcShared.september }),
-  seed("sw-coding", "SW코딩자격", "IT·코딩", catalogSources.kpc, { aliases: ["SW 코딩 자격", "코딩 자격증"], duration: "short", practical: true, events: kpcShared.september }),
-  seed("smat", "SMAT 서비스경영자격", "서비스·경영", catalogSources.kpc, { aliases: ["SMAT"], duration: "short", events: [dateEvent("exam", "exam", "SMAT 정기시험", "2026-08-08")] }),
-  seed("ai-pot", "AI-POT 인공지능 활용능력", "AI·업무", catalogSources.kpc, { aliases: ["AI-POT", "에이아이팟"], duration: "short", events: [dateEvent("exam", "exam", "AI-POT 정기시험", "2026-08-08")] }),
+  // 현재 공식 접수 화면에 노출되지 않은 종목은 임의의 이전 회차를 계속 표시하지 않는다.
+  seed("aibt", "AIBT 인공지능 비즈니스 활용능력", "AI·업무", catalogSources.kpc, { aliases: ["AIBT"], duration: "short", events: [] }),
+  seed("cat", "CAT 캐드실무능력평가", "설계·IT", catalogSources.kpc, { aliases: ["CAT", "캐드 자격증"], duration: "short", practical: true, events: kpcShared.october }),
+  seed("sw-coding", "SW코딩자격", "IT·코딩", catalogSources.kpc, { aliases: ["SW 코딩 자격", "코딩 자격증"], duration: "short", practical: true, events: [] }),
+  seed("smat", "SMAT 서비스경영자격", "서비스·경영", catalogSources.kpc, { aliases: ["SMAT"], duration: "short", events: kpcShared.october }),
+  seed("ai-pot", "AI-POT 인공지능 활용능력", "AI·업무", catalogSources.kpc, { aliases: ["AI-POT", "에이아이팟"], duration: "short", events: kpcShared.october }),
 ];
 
 const atEvents: EventSeed[] = [
