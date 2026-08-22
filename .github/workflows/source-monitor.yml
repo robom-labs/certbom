@@ -2,11 +2,10 @@ name: Official Source Monitor
 
 # Read-only monitor: fetches each official exam source and records HTTP status +
 # SHA-256 of the body into ops/source-registry/source-hashes.json. No secrets,
-# public URLs only. Commits the snapshot back only when it changes.
+# public URLs only. Commits the snapshot back only when it changes. Scheduled
+# execution remains paused until the next version submission is explicitly started.
 
 on:
-  schedule:
-    - cron: "0 18 * * *"
   workflow_dispatch:
 
 permissions:
