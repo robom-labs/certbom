@@ -1,7 +1,7 @@
 <!-- 자격증봄 프로덕션 출시의 검증 증거와 재개 지점을 기록하는 진행 원장이다. -->
 # 자격증봄 프로덕션 출시 진행 원장
 
-마지막 갱신은 2026-08-22 19:20 KST다.
+마지막 갱신은 2026-08-22 19:34 KST다.
 
 ## 절대 완료 조건
 
@@ -18,6 +18,10 @@
 
 - Play Console 앱은 `자격증봄`, package는 `kr.robom.certbom`이다.
 - 현재 일반 사용자에게 공개된 릴리스는 versionName `0.9.0`, versionCode `16`이며 2026-08-11 23:45 KST에 100% 프로덕션 배포를 확인했다.
+- 다음 프로덕션 후보는 versionName `0.9.0`, versionCode `17`이며 2026-08-22에 Google Play 검토로 전송했다. 콘솔의 현재 상태는 `검토 중인 변경사항`이며, 일반 사용자 공개 전에는 versionCode `17` 공개 완료로 처리하지 않는다.
+- 제출 AAB는 `/tmp/certbom-local-release-v17/certbom-0.9.0-v17.aab`이고 SHA-256은 `11e213493db18f3da52ac6341524b0826280e231b30cadc2dce41d5756307bf9`다. Bundletool 검증, package `kr.robom.certbom`, versionCode `17`, target SDK `36`, 그리고 기존 versionCode `16` AAB와 같은 서명 인증서 SHA-256을 확인했다.
+- 제출 소스 SHA는 `c65359cf172f29a9ba42e10951652c47e1a4df9f`이며, 이 SHA의 GitHub CI와 Family contract가 모두 성공했다.
+- Google Play Console은 코드 `17 (0.9.0)`, 모든 대상 국가, 전체 출시, 한국어 출시 노트 `안정성과 보안을 개선했습니다.`를 검토 화면에서 표시했다.
 - 공개 AAB는 `/Users/runner706/Documents/Codex/2026-07-11/02/work/release-archives/certbom-0.9.0-v16-pending/certbom-0.9.0-v16.aab`이고 SHA-256은 `c1133062254ca70bab7f1119912aed67f8a704aa510ecb3d5e2df8e986de02d4`이다.
 - 공개 제품 소스 SHA는 `8cebe2ba9414717b2162329efcae2565e5aff7fd`다. 이 커밋의 `apps/mobile/app.json`은 package `kr.robom.certbom`, version `0.9.0`, Android versionCode `16`을 선언한다.
 - 다음 Google Play 업데이트는 versionCode `17` 이상으로 새 AAB를 만들어야 한다. 공개 versionCode `16` AAB는 재사용하지 않는다.
