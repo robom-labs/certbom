@@ -1,17 +1,16 @@
 // 자격증봄의 홈·시험 찾기·달력·알림·설정과 Android 뒤로가기를 네이티브 흐름으로 제공한다.
 import {
   CATALOG_DATA_VERSION,
-  CATALOG_REVIEWED_AT,
   catalogStats,
   createGoogleCalendarUrl,
   exams,
-  getAttemptEvents,
   getExam,
   getExamAttempts,
   getHomeSummaryExams,
   getNextAttemptEvent,
   getNextEvent,
   getOfficialExamActions,
+  getUpcomingAttemptEvents,
   getUpcomingEvents,
   isApplicationOpen,
   type Exam,
@@ -277,7 +276,7 @@ function HomeScreen({ attemptSelections, checkedPreparationIds, favoriteIds, jou
   return (
     <ScrollView contentContainerStyle={adaptiveContentStyle(layout)} showsVerticalScrollIndicator={false}>
       <View style={styles.heroCard}>
-        <Text style={styles.heroKicker}>공식 일정 기준 · {new Date(CATALOG_REVIEWED_AT).toLocaleDateString("ko-KR", { year: "numeric", month: "long", timeZone: "Asia/Seoul" })} 검토본</Text>
+        <Text style={styles.heroKicker}>공식 일정 기준 · 오늘 이후 일정만 표시</Text>
         <Text style={styles.heroTitle}>접수할 시험과{`\n`}다음 일정을 <Text style={styles.heroHighlight}>한눈에.</Text></Text>
         <Text style={styles.heroDescription}>시험을 찾고 관심 목록에 저장하면 달력과 알림에서 이어서 관리할 수 있어요.</Text>
         <Pressable accessibilityRole="button" onPress={onFind} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
@@ -312,7 +311,7 @@ function HomeScreen({ attemptSelections, checkedPreparationIds, favoriteIds, jou
           const completed = exam.preparation.filter((item) => checkedPreparationIds.includes(item.id)).length + journey.tasks.filter((task) => task.completed).length;
           const total = exam.preparation.length + journey.tasks.length;
           const attemptKey = attemptSelections.find((item) => item.examId === exam.id)?.attemptKey;
-          const selectedEvents = getAttemptEvents(exam, attemptKey);
+          const selectedEvents = getUpcomingAttemptEvents(exam, attemptKey);
           const nextEvent = getNextAttemptEvent(exam, attemptKey);
           return <Pressable key={exam.id} onPress={() => onOpen(exam)} style={({ pressed }) => [styles.journeyCard, pressed && styles.pressed]}><View style={styles.journeyCardTop}><View style={styles.journeyCardCopy}><Text numberOfLines={1} style={styles.journeyCardTitle}>{exam.name}</Text><Text style={styles.journeyCardStage}>{attemptKey ? `${journeyStageLabel(journey.stage)} · 선택 일정` : journeyStageLabel(journey.stage)}</Text></View><Text style={styles.journeyCardDday}>{nextEvent ? dDayLabel(nextEvent.startAt) : "일정 확인"}</Text></View><Text style={styles.journeyCardAction}>{journeyNextAction(exam, journey.stage, requiredIncomplete, journey.tasks, selectedEvents)}</Text><View style={styles.journeyMiniProgress}><View style={[styles.journeyMiniProgressValue, { width: `${total ? Math.round((completed / total) * 100) : 0}%` }]} /></View><Text style={styles.journeyCardMeta}>준비 {completed}/{total} · 눌러서 계속하기</Text></Pressable>;
         })}
@@ -378,7 +377,7 @@ function CalendarScreen({ attemptSelections, favoriteIds, onOpen }: { attemptSel
   const [savedOnly, setSavedOnly] = useState(false);
   const events = useMemo(() => exams.flatMap((exam) => {
     const attemptKey = attemptSelections.find((item) => item.examId === exam.id)?.attemptKey;
-    return getAttemptEvents(exam, savedOnly && favoriteIds.includes(exam.id) ? attemptKey : undefined).map((event) => ({ exam, event }));
+    return getUpcomingAttemptEvents(exam, savedOnly && favoriteIds.includes(exam.id) ? attemptKey : undefined).map((event) => ({ exam, event }));
   }).filter(({ exam }) => !savedOnly || favoriteIds.includes(exam.id)), [attemptSelections, favoriteIds, savedOnly]);
   const eventDates = useMemo(() => new Set(events.map(({ event }) => dateKey(event.startAt))), [events]);
   const selectedEvents = events.filter(({ event }) => dateKey(event.startAt) === selectedDate).sort((a, b) => a.event.startAt.localeCompare(b.event.startAt));
@@ -428,7 +427,7 @@ function RemindersScreen({ attemptSelections, checkedPreparationIds, favoriteIds
         const journey = journeys.find((item) => item.examId === exam.id) ?? { examId: exam.id, stage: "watching" as const, tasks: [] };
         const requiredIncomplete = exam.preparation.filter((item) => item.importance === "required" && !checkedPreparationIds.includes(item.id)).length;
         const attemptKey = attemptSelections.find((item) => item.examId === exam.id)?.attemptKey;
-        const selectedEvents = getAttemptEvents(exam, attemptKey);
+        const selectedEvents = getUpcomingAttemptEvents(exam, attemptKey);
         const nextEvent = getNextAttemptEvent(exam, attemptKey);
         return <View key={exam.id} style={styles.reminderCard}><Pressable onPress={() => onOpen(exam)} style={styles.reminderCardCopy}><View style={styles.examNameRow}><Text style={styles.reminderExamName}>{exam.name}</Text><Text style={styles.favoriteBadge}>{attemptKey ? "선택 일정" : journeyStageLabel(journey.stage)}</Text></View><Text style={styles.reminderExamAction}>{journeyNextAction(exam, journey.stage, requiredIncomplete, journey.tasks, selectedEvents)}</Text><Text style={styles.reminderExamMeta}>{nextEvent ? formatDate(nextEvent.startAt, true) : "예약 가능한 미래 일정 없음"}</Text></Pressable><View style={[styles.reminderChip, scheduledCount > 0 && styles.reminderChipActive]}><Text style={[styles.reminderChipText, scheduledCount > 0 && styles.reminderChipTextActive]}>{scheduledCount > 0 && preference ? `${scheduledCount}개 알림` : "알림 꺼짐"}</Text></View><Pressable accessibilityLabel={`${exam.name} 알림 설정`} onPress={() => onEdit(exam)} style={styles.editButton}><Text style={styles.editButtonText}>설정</Text></Pressable></View>;
       }) : <View style={styles.emptyCard}><Text style={styles.emptyTitle}>저장한 관심 시험이 없어요.</Text><Text style={styles.emptyText}>시험 찾기에서 관심 시험을 저장하면 여기서 알림 시점을 고를 수 있어요.</Text></View>}
@@ -474,8 +473,8 @@ function DetailScreen({ attemptSelection, checkedPreparationIds, exam, favorite,
 }) {
   const layout = useCertbomLayout();
   const [taskDraft, setTaskDraft] = useState("");
-  const attempts = getExamAttempts(exam);
-  const selectedEvents = getAttemptEvents(exam, attemptSelection?.attemptKey);
+  const attempts = getExamAttempts(exam).filter((attempt) => getUpcomingAttemptEvents(exam, attempt.key).length > 0);
+  const selectedEvents = getUpcomingAttemptEvents(exam, attemptSelection?.attemptKey);
   const next = getNextAttemptEvent(exam, attemptSelection?.attemptKey);
   const officialActions = getOfficialExamActions(exam);
   const applicationUrl = exam.applicationUrl;
@@ -604,7 +603,7 @@ function MobileApp() {
       const validJourneys = storedJourneys.filter((item) => Boolean(getExam(item.examId)));
       const validAttemptSelections = storedAttemptSelections.filter((selection) => {
         const exam = getExam(selection.examId);
-        return Boolean(exam && getExamAttempts(exam).some((attempt) => attempt.key === selection.attemptKey));
+        return Boolean(exam && getUpcomingAttemptEvents(exam, selection.attemptKey).length > 0);
       });
       const storedById = new Map(storedPreferences.map((item) => [item.examId, item]));
       for (const item of scheduled) if (!storedById.has(item.examId)) storedById.set(item.examId, { examId: item.examId, daysBefore: item.daysBefore, scope: item.scope });

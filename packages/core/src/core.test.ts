@@ -17,6 +17,7 @@ import {
   getNextAttemptEvent,
   getOfficialExamActions,
   getSameDayExamGroups,
+  getUpcomingAttemptEvents,
   getUpcomingEventGroups,
   getUpcomingEvents,
   isApplicationOpen,
@@ -119,6 +120,17 @@ describe("시험 카탈로그", () => {
     if (!engineer) throw new Error("회차 다음 일정 테스트용 시험이 없습니다.");
     const next = getNextAttemptEvent(engineer, "qnet-technical-2026-r3-practical", new Date("2026-09-10T12:00:00+09:00"));
     expect(next?.id).toBe("information-engineer-r3-practical-application-a");
+  });
+
+  it("오늘 기준으로 지난 회차 일정은 화면용 목록에서 제외한다", () => {
+    const engineer = getExam("information-engineer");
+    if (!engineer) throw new Error("오늘 기준 일정 테스트용 시험이 없습니다.");
+    const now = new Date("2026-08-22T12:00:00+09:00");
+    const events = getUpcomingAttemptEvents(engineer, undefined, now);
+
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.every((event) => eventRelevantUntil(event) >= now.getTime())).toBe(true);
+    expect(events.some((event) => event.startAt.startsWith("2026-07-"))).toBe(false);
   });
 
   it("홈 요약 필터가 전체·현재 접수·14일 안 시험을 같은 판정 함수로 계산한다", () => {

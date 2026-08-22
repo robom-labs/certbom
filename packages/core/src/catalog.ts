@@ -344,8 +344,13 @@ export function getAttemptEvents(exam: Exam, attemptKey?: string) {
   return attemptKey ? exam.events.filter((event) => event.attemptKey === attemptKey) : exam.events;
 }
 
+// 화면에서 과거 접수·시험·발표 일정을 현재 일정처럼 보여주지 않도록 미래 일정만 반환한다.
+export function getUpcomingAttemptEvents(exam: Exam, attemptKey?: string, now = new Date()) {
+  return getAttemptEvents(exam, attemptKey).filter((event) => eventRelevantUntil(event) >= now.getTime());
+}
+
 export function getNextAttemptEvent(exam: Exam, attemptKey?: string, now = new Date()) {
-  return getNextEventFromEvents(getAttemptEvents(exam, attemptKey), now);
+  return getNextEventFromEvents(getUpcomingAttemptEvents(exam, attemptKey, now), now);
 }
 
 export function getUpcomingEvents(now = new Date()) {
