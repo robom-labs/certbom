@@ -12,9 +12,9 @@ describe("시험 일정 표시", () => {
   });
 
   it("현재 접수 중인 시험을 분명하게 표시한다", () => {
-    const exam = getExam("itq");
-    if (!exam) throw new Error("ITQ 시험이 없습니다.");
-    expect(examStatusLabel(exam, new Date("2026-07-16T12:00:00+09:00"))).toBe("지금 접수 중");
+    const exam = getExam("gtq");
+    if (!exam) throw new Error("GTQ 시험이 없습니다.");
+    expect(examStatusLabel(exam, new Date("2026-08-22T12:00:00+09:00"))).toBe("지금 접수 중");
   });
 
   it("상시 시험에 API 미연결 문구 대신 공식 접수 행동을 안내한다", () => {

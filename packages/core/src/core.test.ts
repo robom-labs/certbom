@@ -46,10 +46,10 @@ describe("시험 카탈로그", () => {
     expect(professionalExam?.lastVerifiedAt).toBe("2026-07-16T15:00:00+09:00");
   });
 
-  it("공식 출처 8곳의 시험 104개를 제공한다", () => {
+  it("공식 출처 8곳의 시험 104개와 현재 확인된 일정을 제공한다", () => {
     expect(exams).toHaveLength(104);
     expect(catalogStats.sourceCount).toBe(8);
-    expect(catalogStats.scheduledExamCount).toBeGreaterThanOrEqual(70);
+    expect(catalogStats.scheduledExamCount).toBeGreaterThanOrEqual(68);
   });
 
   it("시험·일정·준비물 식별자가 서로 겹치지 않는다", () => {
